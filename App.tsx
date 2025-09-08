@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Task, User, ViewType, Status, Priority, ChatMessage, Toast, ActivityLog, TaskData } from './types';
+import { Task, User, ViewType, Status, Priority, ChatMessage, Toast, ActivityLog, TaskData, AuthUser } from './types';
 import Header from './components/Header';
 import TaskBoard from './components/TaskBoard';
 import MonthlyView from './components/MonthlyView';
@@ -12,6 +12,8 @@ import AIAssistant from './components/AIAssistant';
 import ToastContainer from './components/ToastContainer';
 import ActivityFeed from './components/ActivityFeed';
 import UserProfileModal from './components/UserProfileModal';
+import Login from './components/Login';
+import { authService } from './services/authService';
 
 // Mock Data for Users (can be moved to Firebase/Auth later)
 const MOCK_USERS: User[] = [
@@ -24,6 +26,10 @@ const MOCK_USERS: User[] = [
 const CURRENT_USER_ID = 'u1'; // Let's assume Alex is the current user
 
 export const App: React.FC = () => {
+  // Authentication state
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users] = useState<User[]>(MOCK_USERS);
   const usersMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
@@ -72,6 +78,38 @@ export const App: React.FC = () => {
     const unsubscribe = listenToTasks(setTasks);
     return () => unsubscribe();
   }, []);
+
+  // Initialize authentication state on app start
+  useEffect(() => {
+    const initAuth = () => {
+      const user = authService.getCurrentUser();
+      setAuthUser(user);
+      setIsAuthLoading(false);
+    };
+    
+    initAuth();
+  }, []);
+
+  // Authentication handlers
+  const handleLoginSuccess = useCallback((user: AuthUser) => {
+    setAuthUser(user);
+    addToast(`Welcome back, ${user.name}!`, 'success');
+    addActivityLog(`User logged in: ${user.name}`);
+  }, [addToast, addActivityLog]);
+
+  const handleLogout = useCallback(async () => {
+    if (!authUser) return;
+    
+    const userName = authUser.name;
+    await authService.logout();
+    setAuthUser(null);
+    addToast(`Goodbye, ${userName}!`, 'info');
+    addActivityLog(`User logged out: ${userName}`);
+  }, [authUser, addToast, addActivityLog]);
+
+  const handleLoginError = useCallback((message: string) => {
+    addToast(message, 'warning');
+  }, [addToast]);
 
   const handleAddTask = (taskData: TaskData) => {
     addTask(taskData).then(taskId => {
@@ -232,6 +270,32 @@ export const App: React.FC = () => {
     });
   }, [tasks, filters]);
 
+  // Show loading screen while checking authentication
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Team TaskFlow...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!authUser) {
+    return (
+      <>
+        <Login 
+          onLoginSuccess={handleLoginSuccess}
+          onError={handleLoginError}
+        />
+        <ToastContainer toasts={toasts} />
+      </>
+    );
+  }
+
+  // Show main app when authenticated
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <Header
@@ -246,6 +310,8 @@ export const App: React.FC = () => {
         filters={filters}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
+        authUser={authUser}
+        onLogout={handleLogout}
       />
       <main className="flex-1 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-7xl">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ViewType, User, Priority } from '../types';
+import { ViewType, User, Priority, AuthUser } from '../types';
 import { AppIcon, CalendarIcon, LayoutGridIcon, SparklesIcon, ActivityIcon, FilterIcon } from './Icons';
 
 interface HeaderProps {
@@ -15,6 +15,9 @@ interface HeaderProps {
   filters: { assignees: string[]; priorities: Priority[] };
   onFilterChange: (type: 'assignees' | 'priorities', value: string) => void;
   onClearFilters: () => void;
+  // Authentication props
+  authUser: AuthUser;
+  onLogout: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -29,9 +32,13 @@ const Header: React.FC<HeaderProps> = ({
   filters,
   onFilterChange,
   onClearFilters,
+  authUser,
+  onLogout,
 }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const viewButtonClasses = (view: ViewType) => 
     `inline-flex items-center justify-center p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 ${
@@ -44,6 +51,9 @@ const Header: React.FC<HeaderProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setIsFilterOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -150,13 +160,65 @@ const Header: React.FC<HeaderProps> = ({
             >
               <ActivityIcon className="h-5 w-5" />
             </button>
-             <button 
-              onClick={onOpenProfile}
-              className={`w-9 h-9 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500`}
-              aria-label="Open user profile"
-             >
-                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full rounded-full object-cover" />
-            </button>
+            <div className="relative" ref={userMenuRef}>
+              <button 
+                onClick={() => setIsUserMenuOpen(prev => !prev)}
+                className={`w-9 h-9 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 ${
+                  isUserMenuOpen ? 'ring-2 ring-brand-500' : ''
+                }`}
+                aria-label="Open user menu"
+              >
+                <img src={authUser.avatarUrl || currentUser.avatarUrl} alt={authUser.name} className="w-full h-full rounded-full object-cover" />
+              </button>
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-30">
+                  <div className="p-4 border-b border-slate-200">
+                    <div className="flex items-center space-x-3">
+                      <img src={authUser.avatarUrl || currentUser.avatarUrl} alt={authUser.name} className="w-10 h-10 rounded-full object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{authUser.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{authUser.email}</p>
+                        {authUser.role && (
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                            authUser.role === 'admin' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {authUser.role}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        onOpenProfile();
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>Profile Settings</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onLogout();
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
