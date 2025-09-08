@@ -1,0 +1,5 @@
+{
+  "name": "Team TaskFlow",
+  "description": "A collaborative SaaS task management application for teams, featuring due dates, priority levels, assignee tracking, and a comprehensive monthly schedule view. Includes an AI-powered 'Smart Add' feature to create tasks from natural language.",
+  "requestFramePermissions": []
+}
