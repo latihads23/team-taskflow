@@ -15,6 +15,7 @@ export enum Status {
 export enum ViewType {
   Board = 'board',
   Calendar = 'calendar',
+  TimeManagement = 'time-management',
 }
 
 export interface User {
@@ -37,6 +38,12 @@ export interface Task {
   recurrenceRule?: 'daily' | 'weekly' | 'monthly';
   recurrenceEndDate?: string; // YYYY-MM-DD
   originalTaskId?: string; // ID of the first task in a series
+  // Time management fields
+  estimatedDuration?: number; // in minutes
+  actualTimeSpent?: number; // in minutes
+  timeEntries?: TimeEntry[];
+  isEatThatFrog?: boolean; // Most important task of the day
+  timeBoxes?: TimeBox[]; // Scheduled time blocks
 }
 
 // Represents the shape of task data stored in Firestore, before it gets an ID.
@@ -78,4 +85,80 @@ export interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+}
+
+// Time Management Types
+export enum PomodoroState {
+  Idle = 'idle',
+  Work = 'work',
+  ShortBreak = 'short-break',
+  LongBreak = 'long-break',
+}
+
+export interface PomodoroSession {
+  id: string;
+  taskId?: string;
+  state: PomodoroState;
+  duration: number; // in seconds
+  remainingTime: number; // in seconds
+  isActive: boolean;
+  startTime?: Date;
+  endTime?: Date;
+  completedPomodoros: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  taskId: string;
+  startTime: Date;
+  endTime?: Date;
+  duration: number; // in seconds
+  description?: string;
+  isManual?: boolean; // true if manually added, false if tracked
+}
+
+export interface TimeBox {
+  id: string;
+  taskId?: string;
+  title: string;
+  startTime: Date;
+  endTime: Date;
+  description?: string;
+  color?: string;
+  isCompleted?: boolean;
+}
+
+export interface DailyPlan {
+  id: string;
+  date: string; // YYYY-MM-DD
+  userId: string;
+  eatThatFrogTaskId?: string; // Most important task
+  timeBoxes: TimeBox[];
+  totalPlannedMinutes: number;
+  actualMinutes?: number;
+  notes?: string;
+}
+
+export interface TimeTrackingStats {
+  totalTimeToday: number; // in minutes
+  totalTimeThisWeek: number; // in minutes
+  totalTimeThisMonth: number; // in minutes
+  averageDailyTime: number; // in minutes
+  mostProductiveHour: number; // 0-23
+  taskCompletionRate: number; // percentage
+  pomodorosCompleted: number;
+  eatThatFrogStreak: number; // consecutive days
+}
+
+export interface TimeManagementSettings {
+  pomodoroWorkDuration: number; // in minutes, default 25
+  pomodoroShortBreak: number; // in minutes, default 5
+  pomodoroLongBreak: number; // in minutes, default 15
+  pomodorosUntilLongBreak: number; // default 4
+  autoStartBreaks: boolean;
+  autoStartWork: boolean;
+  showNotifications: boolean;
+  defaultTaskDuration: number; // in minutes, default 30
+  workingHoursStart: string; // HH:MM format
+  workingHoursEnd: string; // HH:MM format
 }

@@ -24,7 +24,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   taskContext,
   onSummarizeTask
 }) => {
-  const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+  const [position, setPosition] = useState(() => {
+    // Smart initial positioning
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 20;
+    
+    return {
+      x: viewportWidth - 80 - margin, // 80 = button width + margin
+      y: viewportHeight - 80 - margin  // 80 = button height + margin
+    };
+  });
   const [message, setMessage] = useState('');
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   
@@ -48,6 +58,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
     if (nodeRef.current) {
       const rect = nodeRef.current.getBoundingClientRect();
       dragRef.current = {
@@ -57,20 +68,47 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
           y: e.clientY - rect.top,
         },
       };
+      // Add grabbing cursor to body during drag
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none'; // Prevent text selection
     }
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragRef.current.isDragging || !nodeRef.current) return;
     e.preventDefault();
-    setPosition({
-      x: e.clientX - dragRef.current.offset.x,
-      y: e.clientY - dragRef.current.offset.y,
+    
+    // Calculate new position with improved constraints
+    let newX = e.clientX - dragRef.current.offset.x;
+    let newY = e.clientY - dragRef.current.offset.y;
+    
+    // Get current viewport dimensions (handles resize)
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 10; // Safety margin from edges
+    
+    // Dynamic element size based on current state
+    const elementWidth = isOpen ? 320 : 64; // w-80 = 320px, button = 64px
+    const elementHeight = isOpen ? 448 : 64; // h-[28rem] = 448px, button = 64px
+    
+    // Smart viewport constraints with margins
+    const maxX = viewportWidth - elementWidth - margin;
+    const maxY = viewportHeight - elementHeight - margin;
+    
+    newX = Math.max(margin, Math.min(maxX, newX));
+    newY = Math.max(margin, Math.min(maxY, newY));
+    
+    // Use requestAnimationFrame for smoother dragging
+    requestAnimationFrame(() => {
+      setPosition({ x: newX, y: newY });
     });
-  }, []);
+  }, [isOpen]);
 
   const handleMouseUp = useCallback(() => {
     dragRef.current.isDragging = false;
+    // Reset cursor and user select
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   }, []);
 
   useEffect(() => {
@@ -81,6 +119,45 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [handleMouseMove, handleMouseUp]);
+
+  // Handle window resize to keep AI Assistant in viewport
+  useEffect(() => {
+    const handleResize = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 10;
+      const elementWidth = isOpen ? 320 : 64;
+      const elementHeight = isOpen ? 448 : 64;
+      
+      setPosition(prevPosition => ({
+        x: Math.max(margin, Math.min(viewportWidth - elementWidth - margin, prevPosition.x)),
+        y: Math.max(margin, Math.min(viewportHeight - elementHeight - margin, prevPosition.y))
+      }));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isOpen]);
+
+  // Auto-adjust position when opening/closing to prevent viewport clipping
+  useEffect(() => {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 10;
+    const elementWidth = isOpen ? 320 : 64;
+    const elementHeight = isOpen ? 448 : 64;
+    
+    // Check if current position would clip and adjust if needed
+    const maxX = viewportWidth - elementWidth - margin;
+    const maxY = viewportHeight - elementHeight - margin;
+    
+    if (position.x > maxX || position.y > maxY) {
+      setPosition(prev => ({
+        x: Math.max(margin, Math.min(maxX, prev.x)),
+        y: Math.max(margin, Math.min(maxY, prev.y))
+      }));
+    }
+  }, [isOpen, position.x, position.y]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +181,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
         <button
           onClick={() => onVisibilityChange(true)}
           onMouseDown={handleMouseDown as any}
-          className="w-16 h-16 bg-brand-600 text-white rounded-full shadow-lg flex items-center justify-center cursor-move hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all transform hover:scale-110"
+          className="w-16 h-16 bg-brand-600 text-white rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all transform hover:scale-110 active:scale-105 select-none"
           aria-label="Open AI Assistant"
         >
           <RobotIcon className="w-8 h-8" />
@@ -112,11 +189,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
       )}
 
       {isOpen && (
-        <div className="w-80 h-[28rem] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
-          <div onMouseDown={handleMouseDown as any} className="flex items-center justify-between p-3 bg-slate-50 border-b border-slate-200 cursor-move">
+        <div className="w-80 h-[28rem] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 backdrop-blur-sm">
+          <div onMouseDown={handleMouseDown as any} className="flex items-center justify-between p-3 bg-gradient-to-r from-brand-50 to-purple-50 border-b border-slate-200 cursor-grab active:cursor-grabbing select-none transition-colors hover:from-brand-100 hover:to-purple-100">
             <div className="flex items-center space-x-2">
-              <RobotIcon className="w-6 h-6 text-brand-600" />
-              <h3 className="font-semibold text-slate-800">AI Assistant</h3>
+              <div className="w-8 h-8 bg-gradient-to-r from-brand-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <RobotIcon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800 text-sm">Productivity Assistant</h3>
+                <p className="text-xs text-slate-500">🎯 Work & Time Management Expert</p>
+              </div>
             </div>
             <div className="flex items-center space-x-1">
                 <button onClick={onClearChat} className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500" aria-label="Clear chat">
@@ -129,6 +211,25 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50 space-y-4">
+            {/* Welcome Message */}
+            {history.length === 0 && !isLoading && (
+              <div className="text-center py-6 space-y-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-brand-500 to-purple-500 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-2xl">💼</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-800 text-sm">Ready to boost your productivity?</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    I'm here to help with task management, time optimization, focus techniques, and work strategies.
+                  </p>
+                </div>
+                <div className="flex justify-center space-x-1 text-xs">
+                  <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded-full">Time Management</span>
+                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full">Productivity</span>
+                </div>
+              </div>
+            )}
+            
             {history.map((msg, index) => (
               <div key={index} className={`flex items-start gap-2 group ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                  {msg.role === 'user' && (
@@ -175,6 +276,39 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
           </div>
 
           <div className="p-3 bg-white border-t border-slate-200">
+            {/* Quick Productivity Prompts */}
+            {history.length === 0 && (
+              <div className="mb-3 space-y-2">
+                <p className="text-xs text-slate-500 font-medium">💡 Quick productivity tips:</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    onClick={() => onSendMessage('How to prioritize tasks effectively?')}
+                    className="text-left px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                  >
+                    🎯 Task Priority
+                  </button>
+                  <button
+                    onClick={() => onSendMessage('Best time management techniques for busy days?')}
+                    className="text-left px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                  >
+                    ⏰ Time Management
+                  </button>
+                  <button
+                    onClick={() => onSendMessage('How to maintain focus while working?')}
+                    className="text-left px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                  >
+                    🧠 Stay Focused
+                  </button>
+                  <button
+                    onClick={() => onSendMessage('Tips for better team collaboration?')}
+                    className="text-left px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                  >
+                    🤝 Team Work
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {taskContext && (
                 <div className="mb-2">
                     <button
@@ -192,8 +326,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Ask me anything..."
-                className="flex-1 w-full px-3 py-2 text-sm bg-slate-100 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Ask about productivity, time management, focus..."
+                className="flex-1 w-full px-3 py-2 text-sm bg-slate-100 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 placeholder:text-slate-400"
                 disabled={isLoading}
               />
               <button

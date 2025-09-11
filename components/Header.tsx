@@ -82,6 +82,10 @@ const Header: React.FC<HeaderProps> = ({
                     <CalendarIcon className="h-5 w-5" />
                     <span className="ml-2 text-sm font-medium">Calendar</span>
                 </button>
+                <button onClick={() => onViewChange(ViewType.TimeManagement)} className={viewButtonClasses(ViewType.TimeManagement)}>
+                    ⏰
+                    <span className="ml-2 text-sm font-medium">Time Mgmt</span>
+                </button>
             </div>
           </div>
           <div className="flex items-center space-x-3">

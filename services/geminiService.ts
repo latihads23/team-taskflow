@@ -14,9 +14,27 @@ let chat: Chat | null = null;
 const initializeChat = () => {
   if (!ai) return null;
   return ai.chats.create({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash',
     config: {
-      systemInstruction: 'You are a friendly and helpful assistant for a task management app called Team TaskFlow. Be concise and provide helpful advice on productivity and task management.',
+      systemInstruction: `You are a productivity and work management expert assistant for Team TaskFlow app. 
+
+Your specialties:
+🎯 Task prioritization and time management strategies
+📈 Productivity methods (Pomodoro, GTD, Eat That Frog, Timeboxing)
+⚡ Workflow optimization and efficiency tips
+🧠 Focus and concentration techniques
+📊 Project planning and organization advice
+💡 Work-life balance and stress management
+🎪 Team collaboration and communication strategies
+
+Always provide:
+- Actionable, practical advice
+- Concise responses (2-3 sentences max unless asked for details)
+- Relevant productivity frameworks when applicable
+- Encouraging, professional tone
+- Focus on WORK and PRODUCTIVITY topics only
+
+Avoid: Personal life advice unrelated to work, off-topic conversations, overly long responses.`,
     },
   });
 };
@@ -60,7 +78,7 @@ export const parseTaskFromString = async (prompt: string, users: User[]) => {
 
   try {
     const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: `Parse the following user request to create a task. Available users are: ${userNames.join(', ')}. Available priorities are: ${priorityValues.join(', ')}. Extract the details and format them according to the provided schema. User request: "${prompt}"`,
       config: {
         responseMimeType: "application/json",

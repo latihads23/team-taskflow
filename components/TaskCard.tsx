@@ -59,19 +59,31 @@ export const formatDueDate = (dateString: string) => {
     return { text, color };
 };
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, user, onClick, onDragStart, onDragEnd, isDragging }) => {
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, onClick, onDragStart, onDragEnd, isDragging }) => {
   const { title, description, dueDate, priority } = task;
   const config = priorityConfig[priority];
-  const { text: dateText, color: dateColor } = formatDueDate(dueDate);
+  const { text: dateText, color: dateColor } = React.useMemo(() => formatDueDate(dueDate), [dueDate]);
+
+  const handleClick = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick();
+  }, [onClick]);
+
+  const handleDragStart = React.useCallback((e: React.DragEvent) => {
+    e.stopPropagation();
+    onDragStart(e);
+  }, [onDragStart]);
 
   return (
     <div
       draggable
-      onDragStart={onDragStart}
+      onDragStart={handleDragStart}
       onDragEnd={onDragEnd}
-      onClick={onClick}
-      className={`w-full text-left bg-white rounded-lg shadow-sm border border-slate-200 p-4 space-y-3 hover:shadow-md hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-200 cursor-grab ${
-        isDragging ? 'opacity-50 ring-2 ring-brand-500 ring-offset-2' : ''
+      onClick={handleClick}
+      className={`w-full text-left bg-white rounded-lg shadow-sm border border-slate-200 p-4 space-y-3 hover:shadow-md hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-300 cursor-grab transform ${
+        isDragging 
+          ? 'opacity-70 ring-2 ring-brand-400 ring-offset-2 scale-105 rotate-2 shadow-xl z-50' 
+          : 'hover:scale-102 active:scale-98'
       }`}
     >
       <div className="flex justify-between items-start">
@@ -92,6 +104,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, user, onClick, onDragStart, o
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.task.id === nextProps.task.id &&
+    prevProps.task.title === nextProps.task.title &&
+    prevProps.task.description === nextProps.task.description &&
+    prevProps.task.dueDate === nextProps.task.dueDate &&
+    prevProps.task.priority === nextProps.task.priority &&
+    prevProps.task.status === nextProps.task.status &&
+    prevProps.isDragging === nextProps.isDragging &&
+    prevProps.user?.id === nextProps.user?.id
+  );
+});
+
+TaskCard.displayName = 'TaskCard';
 
 export default TaskCard;

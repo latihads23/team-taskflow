@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Task, User, ViewType, Status, Priority, ChatMessage, Toast, ActivityLog, TaskData, AuthUser } from './types';
+import { Task, User, ViewType, Status, Priority, ChatMessage, Toast, ActivityLog, TaskData, AuthUser, TimeEntry, TimeBox } from './types';
 import Header from './components/Header';
 import TaskBoard from './components/TaskBoard';
 import MonthlyView from './components/MonthlyView';
+import TimeManagementDashboard from './components/time-management/TimeManagementDashboard';
 import TaskFormModal from './components/TaskFormModal';
 import SmartTaskFormModal from './components/SmartTaskFormModal';
 import { parseTaskFromString, chatWithAI, resetChat } from './services/geminiService';
-import { listenToTasks, addTask, updateTask, deleteTask, deleteRecurringSeries } from './services/firebaseService';
+import { listenToTasks, addTask, updateTask, deleteTask, deleteRecurringSeries } from './services/supabaseService';
 import TaskDetailModal from './components/TaskDetailModal';
 import AIAssistant from './components/AIAssistant';
 import ToastContainer from './components/ToastContainer';
@@ -15,7 +16,7 @@ import UserProfileModal from './components/UserProfileModal';
 import Login from './components/Login';
 import { authService } from './services/authService';
 
-// Mock Data for Users (can be moved to Firebase/Auth later)
+// Mock Data for Users (can be moved to Supabase Auth later)
 const MOCK_USERS: User[] = [
   { id: 'u1', name: 'Alex Johnson', email: 'alex.johnson@example.com', avatarUrl: 'https://i.pravatar.cc/150?u=u1' },
   { id: 'u2', name: 'Maria Garcia', email: 'maria.garcia@example.com', avatarUrl: 'https://i.pravatar.cc/150?u=u2' },
@@ -51,6 +52,10 @@ export const App: React.FC = () => {
   const [isActivityFeedOpen, setActivityFeedOpen] = useState(false);
   const [isUserProfileOpen, setUserProfileOpen] = useState(false);
 
+  // Time Management state
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [timeBoxes, setTimeBoxes] = useState<TimeBox[]>([]);
+
   // New state for filtering
   const [filters, setFilters] = useState<{ assignees: string[]; priorities: Priority[] }>({
     assignees: [],
@@ -74,10 +79,24 @@ export const App: React.FC = () => {
       setActivityLogs(prev => [newLog, ...prev].slice(0, 50)); // Keep last 50 logs
   }, []);
 
+  // Load initial tasks on mount - simple approach
   useEffect(() => {
-    const unsubscribe = listenToTasks(setTasks);
-    return () => unsubscribe();
-  }, []);
+    const loadTasks = async () => {
+      try {
+        const { listenToTasks } = await import('./services/supabaseService');
+        const unsubscribe = listenToTasks(setTasks);
+        
+        // Keep the listener for real-time updates
+        // But we'll also do optimistic updates for better UX
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+        addToast('Failed to load tasks', 'warning');
+      }
+    };
+    
+    loadTasks();
+  }, [addToast]);
 
   // Initialize authentication state on app start
   useEffect(() => {
@@ -112,22 +131,56 @@ export const App: React.FC = () => {
   }, [addToast]);
 
   const handleAddTask = (taskData: TaskData) => {
+    // Create temporary task with ID for immediate UI update
+    const tempId = `temp_${Date.now()}`;
+    const tempTask: Task = {
+      ...taskData,
+      id: tempId,
+    };
+    
+    // Optimistic update - immediate UI response
+    setTasks(prevTasks => [...prevTasks, tempTask]);
+    
+    // Show immediate feedback
+    addToast("Task created successfully!", "success");
+    addActivityLog(`Created task: "${taskData.title}"`);
+    setTaskFormOpen(false);
+    setSelectedTask(null);
+    
+    // Add to database and replace temp task with real one
     addTask(taskData).then(taskId => {
-        addToast("Task created successfully!", "success");
-        addActivityLog(`Created task: "${taskData.title}"`);
-        setTaskFormOpen(false);
-        setSelectedTask(null);
-    }).catch(e => addToast(e.message, 'warning'));
+        setTasks(prevTasks => 
+          prevTasks.map(t => 
+            t.id === tempId ? { ...taskData, id: taskId } : t
+          )
+        );
+    }).catch(e => {
+        // Remove temp task on failure
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== tempId));
+        addToast(`Failed to create task: ${e.message}`, 'warning');
+    });
   };
 
   const handleUpdateTask = (taskData: Task) => {
-    updateTask(taskData.id, taskData).then(() => {
-        addToast("Task updated successfully!", "success");
-        addActivityLog(`Updated task: "${taskData.title}"`);
-        setTaskFormOpen(false);
-        setDetailModalOpen(false);
-        setSelectedTask(null);
-    }).catch(e => addToast(e.message, 'warning'));
+    // Optimistic update - immediate UI response
+    setTasks(prevTasks => 
+      prevTasks.map(t => 
+        t.id === taskData.id ? { ...taskData } : t
+      )
+    );
+    
+    // Show immediate feedback
+    addToast("Task updated successfully!", "success");
+    addActivityLog(`Updated task: "${taskData.title}"`);
+    setTaskFormOpen(false);
+    setDetailModalOpen(false);
+    setSelectedTask(null);
+    
+    // Update in database (if fails, we'll show error)
+    updateTask(taskData.id, taskData).catch(e => {
+        addToast(`Failed to update task: ${e.message}`, 'warning');
+        // Note: We could implement revert logic here if needed
+    });
   };
 
   const handleSaveTask = (taskData: Omit<Task, 'id'> | Task) => {
@@ -155,41 +208,77 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleStatusChange = (taskId: string, newStatus: Status) => {
+  const handleStatusChange = useCallback((taskId: string, newStatus: Status) => {
     const task = tasks.find(t => t.id === taskId);
     if(task && task.status !== newStatus) {
-        updateTask(taskId, { status: newStatus }).then(() => {
-            addToast(`Task moved to ${newStatus}`, "info");
-            addActivityLog(`Moved task "${task.title}" to ${newStatus}`);
-        }).catch(e => addToast(e.message, 'warning'));
+        // Optimistic update - immediate UI response
+        setTasks(prevTasks => 
+          prevTasks.map(t => 
+            t.id === taskId ? { ...t, status: newStatus } : t
+          )
+        );
+        
+        // Show immediate feedback
+        addToast(`Task moved to ${newStatus}`, "success");
+        addActivityLog(`Moved task "${task.title}" to ${newStatus}`);
+        
+        // Update in database (if fails, we'll revert)
+        updateTask(taskId, { status: newStatus }).catch(e => {
+            // Revert optimistic update on failure
+            setTasks(prevTasks => 
+              prevTasks.map(t => 
+                t.id === taskId ? { ...t, status: task.status } : t
+              )
+            );
+            addToast(`Failed to move task: ${e.message}`, 'warning');
+        });
     }
-  };
+  }, [tasks, addToast, addActivityLog]);
   
   const handleDeleteTask = () => {
     if (!selectedTask) return;
     
+    // Immediate UI update
+    const taskToDelete = selectedTask;
+    setDetailModalOpen(false);
+    setSelectedTask(null);
+    
     if (selectedTask.isRecurring && selectedTask.originalTaskId) {
         const userResponse = confirm("This is a recurring task. Do you want to delete the entire series?");
         if (userResponse) {
-            deleteRecurringSeries(selectedTask.originalTaskId).then(() => {
-                addToast("Recurring series deleted.", "success");
-                addActivityLog(`Deleted recurring series for "${selectedTask.title}"`);
-            }).catch(e => addToast(e.message, 'warning'));
+            // Optimistic update - remove all tasks with same originalTaskId
+            setTasks(prevTasks => 
+              prevTasks.filter(t => t.originalTaskId !== selectedTask.originalTaskId && t.id !== selectedTask.id)
+            );
+            addToast("Recurring series deleted.", "success");
+            addActivityLog(`Deleted recurring series for "${selectedTask.title}"`);
+            
+            deleteRecurringSeries(selectedTask.originalTaskId).catch(e => {
+                addToast(`Failed to delete series: ${e.message}`, 'warning');
+                // Could implement revert logic here
+            });
         } else {
-             deleteTask(selectedTask.id).then(() => {
-                addToast("Task instance deleted.", "success");
-                addActivityLog(`Deleted one instance of "${selectedTask.title}"`);
-            }).catch(e => addToast(e.message, 'warning'));
+            // Optimistic update - remove single task
+            setTasks(prevTasks => prevTasks.filter(t => t.id !== selectedTask.id));
+            addToast("Task instance deleted.", "success");
+            addActivityLog(`Deleted one instance of "${selectedTask.title}"`);
+            
+            deleteTask(selectedTask.id).catch(e => {
+                addToast(`Failed to delete task: ${e.message}`, 'warning');
+                // Could implement revert logic here
+            });
         }
     } else {
-        deleteTask(selectedTask.id).then(() => {
-            addToast("Task deleted.", "success");
-            addActivityLog(`Deleted task "${selectedTask.title}"`);
-        }).catch(e => addToast(e.message, 'warning'));
+        // Optimistic update - remove single task
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== selectedTask.id));
+        addToast("Task deleted.", "success");
+        addActivityLog(`Deleted task "${selectedTask.title}"`);
+        
+        deleteTask(selectedTask.id).catch(e => {
+            addToast(`Failed to delete task: ${e.message}`, 'warning');
+            // Could implement revert logic here
+        });
     }
-    
-    setDetailModalOpen(false);
-    setSelectedTask(null);
   };
   
   const handleViewDetails = (task: Task) => {
@@ -257,6 +346,53 @@ export const App: React.FC = () => {
     setFilters({ assignees: [], priorities: [] });
   }, []);
 
+  // Time Management handlers
+  const handleTimeEntryAdd = useCallback((entry: TimeEntry) => {
+    setTimeEntries(prev => [...prev, entry]);
+    addToast('Time entry added', 'success');
+    addActivityLog(`Added time entry: ${Math.round(entry.duration / 60)} minutes`);
+  }, [addToast, addActivityLog]);
+
+  const handleTimeEntryUpdate = useCallback((entryId: string, updates: Partial<TimeEntry>) => {
+    setTimeEntries(prev => prev.map(entry => 
+      entry.id === entryId ? { ...entry, ...updates } : entry
+    ));
+    addToast('Time entry updated', 'success');
+  }, [addToast]);
+
+  const handleTimeEntryDelete = useCallback((entryId: string) => {
+    setTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
+    addToast('Time entry deleted', 'success');
+  }, [addToast]);
+
+  const handleTimeBoxAdd = useCallback((timeBox: TimeBox) => {
+    setTimeBoxes(prev => [...prev, timeBox]);
+    addToast('Time block added', 'success');
+    addActivityLog(`Scheduled time block: "${timeBox.title}"`);
+  }, [addToast, addActivityLog]);
+
+  const handleTimeBoxUpdate = useCallback((timeBoxId: string, updates: Partial<TimeBox>) => {
+    setTimeBoxes(prev => prev.map(timeBox => 
+      timeBox.id === timeBoxId ? { ...timeBox, ...updates } : timeBox
+    ));
+    if (updates.isCompleted) {
+      const timeBox = timeBoxes.find(tb => tb.id === timeBoxId);
+      if (timeBox) {
+        addToast(`Time block "${timeBox.title}" completed! 🎉`, 'success');
+        addActivityLog(`Completed time block: "${timeBox.title}"`);
+      }
+    }
+  }, [timeBoxes, addToast, addActivityLog]);
+
+  const handleTimeBoxDelete = useCallback((timeBoxId: string) => {
+    const timeBox = timeBoxes.find(tb => tb.id === timeBoxId);
+    setTimeBoxes(prev => prev.filter(timeBox => timeBox.id !== timeBoxId));
+    if (timeBox) {
+      addToast('Time block deleted', 'success');
+      addActivityLog(`Deleted time block: "${timeBox.title}"`);
+    }
+  }, [timeBoxes, addToast, addActivityLog]);
+
   // New memo for filtered tasks
   const filteredTasks = useMemo(() => {
     const { assignees, priorities } = filters;
@@ -322,13 +458,27 @@ export const App: React.FC = () => {
               onViewDetails={handleViewDetails}
               onStatusChange={handleStatusChange}
             />
-          ) : (
+          ) : currentView === ViewType.Calendar ? (
             <MonthlyView
               tasks={filteredTasks}
               usersMap={usersMap}
               onViewDetails={handleViewDetails}
             />
-          )}
+          ) : currentView === ViewType.TimeManagement ? (
+            <TimeManagementDashboard
+              tasks={filteredTasks}
+              users={users}
+              onTaskUpdate={handleUpdateTask}
+              onTimeEntryAdd={handleTimeEntryAdd}
+              onTimeEntryUpdate={handleTimeEntryUpdate}
+              onTimeEntryDelete={handleTimeEntryDelete}
+              onTimeBoxAdd={handleTimeBoxAdd}
+              onTimeBoxUpdate={handleTimeBoxUpdate}
+              onTimeBoxDelete={handleTimeBoxDelete}
+              timeEntries={timeEntries}
+              timeBoxes={timeBoxes}
+            />
+          ) : null}
         </div>
       </main>
       
