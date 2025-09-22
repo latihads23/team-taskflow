@@ -4,6 +4,7 @@ import PomodoroTimer from './PomodoroTimer';
 import TimeTracker from './TimeTracker';
 import EatThatFrog from './EatThatFrog';
 import DailyPlanner from './DailyPlanner';
+import EisenhowerMatrix from './EisenhowerMatrix';
 
 interface TimeManagementDashboardProps {
   tasks: Task[];
@@ -45,7 +46,7 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
   timeEntries = [],
   timeBoxes = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'pomodoro' | 'tracker' | 'planner' | 'frog'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pomodoro' | 'tracker' | 'planner' | 'frog' | 'matrix'>('overview');
   const [settings, setSettings] = useState<TimeManagementSettings>(DEFAULT_SETTINGS);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
@@ -130,6 +131,7 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
   const tabs = [
     { id: 'overview', label: '🏠 Overview', emoji: '🏠' },
     { id: 'frog', label: '🐸 Eat That Frog', emoji: '🐸' },
+    { id: 'matrix', label: '📊 Eisenhower Matrix', emoji: '📊' },
     { id: 'pomodoro', label: '🍅 Pomodoro', emoji: '🍅' },
     { id: 'tracker', label: '⏱️ Time Tracker', emoji: '⏱️' },
     { id: 'planner', label: '📅 Daily Planner', emoji: '📅' },
@@ -214,7 +216,7 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">🚀 Quick Actions</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <button
                   onClick={() => setActiveTab('frog')}
                   className={`p-4 rounded-lg border-2 transition-colors ${
@@ -239,6 +241,14 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
                 </button>
                 
                 <button
+                  onClick={() => setActiveTab('matrix')}
+                  className="p-4 rounded-lg border-2 border-purple-300 bg-purple-50 text-purple-800 hover:bg-purple-100 transition-colors"
+                >
+                  <div className="text-2xl mb-1">📊</div>
+                  <div className="text-sm font-medium">Prioritize Tasks</div>
+                </button>
+                
+                <button
                   onClick={() => setActiveTab('pomodoro')}
                   className="p-4 rounded-lg border-2 border-red-300 bg-red-50 text-red-800 hover:bg-red-100 transition-colors"
                 >
@@ -256,7 +266,7 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
                 
                 <button
                   onClick={() => setActiveTab('planner')}
-                  className="p-4 rounded-lg border-2 border-purple-300 bg-purple-50 text-purple-800 hover:bg-purple-100 transition-colors"
+                  className="p-4 rounded-lg border-2 border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 transition-colors"
                 >
                   <div className="text-2xl mb-1">📅</div>
                   <div className="text-sm font-medium">Plan Day</div>
@@ -355,6 +365,18 @@ const TimeManagementDashboard: React.FC<TimeManagementDashboardProps> = ({
             tasks={tasks}
             onTaskUpdate={onTaskUpdate}
             onEatThatFrogComplete={handleEatThatFrogComplete}
+          />
+        )}
+        
+        {activeTab === 'matrix' && (
+          <EisenhowerMatrix
+            tasks={tasks}
+            users={users}
+            onTaskUpdate={onTaskUpdate}
+            onViewTask={(task) => {
+              // Handle view task - could open task detail modal
+              console.log('Viewing task:', task);
+            }}
           />
         )}
       </div>

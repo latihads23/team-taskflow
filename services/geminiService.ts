@@ -103,6 +103,8 @@ export const parseTaskFromString = async (prompt: string, users: User[]) => {
       priority: parsedData.priority || Priority.Medium,
       assigneeId: assignedUser.id,
       status: Status.ToDo,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
   } catch (error) {

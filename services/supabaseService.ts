@@ -34,6 +34,8 @@ const rowToTask = (row: TaskRow): Task => {
     recurrenceRule: row.recurrence_rule as Task['recurrenceRule'],
     recurrenceEndDate: row.recurrence_end_date,
     originalTaskId: row.original_task_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 

@@ -16,13 +16,51 @@ export enum ViewType {
   Board = 'board',
   Calendar = 'calendar',
   TimeManagement = 'time-management',
+  UserManagement = 'user-management',
+  CategoryManagement = 'category-management',
 }
 
 export interface User {
   id: string;
   name: string;
   avatarUrl: string;
-  email?: string;
+  email: string;
+  role: 'admin' | 'user';
+  isActive: boolean;
+  // Enhanced user fields
+  phone?: string;
+  department?: string;
+  position?: string;
+  location?: string;
+  bio?: string;
+  skills?: string[];
+  startDate?: string; // YYYY-MM-DD
+  reportingTo?: string; // User ID
+  directReports?: string[]; // User IDs
+  profilePicture?: string; // URL to profile picture
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+    github?: string;
+  };
+  preferences?: {
+    timezone?: string;
+    language?: string;
+    notifications?: boolean;
+    theme?: 'light' | 'dark' | 'auto';
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+  createdBy: string; // user ID
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Task {
@@ -33,6 +71,7 @@ export interface Task {
   dueDate: string; // YYYY-MM-DD
   priority: Priority;
   status: Status;
+  categoryId?: string; // Category for better organization
   reminderAt?: string; // ISO string for date and time
   isRecurring?: boolean;
   recurrenceRule?: 'daily' | 'weekly' | 'monthly';
@@ -43,7 +82,10 @@ export interface Task {
   actualTimeSpent?: number; // in minutes
   timeEntries?: TimeEntry[];
   isEatThatFrog?: boolean; // Most important task of the day
+  eatThatFrogDate?: string; // YYYY-MM-DD - which date this is the frog for
   timeBoxes?: TimeBox[]; // Scheduled time blocks
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Represents the shape of task data stored in Firestore, before it gets an ID.
