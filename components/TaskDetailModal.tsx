@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, User, Priority, Status } from '../types';
-import { CloseIcon, EditIcon, TrashIcon, CalendarIcon, FlagIcon, UserIcon, BellIcon, ChevronDownIcon, SparklesIcon, RefreshCwIcon } from './Icons';
+import { Task, User, Priority, Status, Category } from '../types';
+import { CloseIcon, EditIcon, TrashIcon, CalendarIcon, FlagIcon, UserIcon, BellIcon, ChevronDownIcon, SparklesIcon, RefreshCwIcon, TagIcon } from './Icons';
 import { formatDueDate } from './TaskCard';
 
 interface TaskDetailModalProps {
@@ -11,6 +11,7 @@ interface TaskDetailModalProps {
   onDelete: () => void;
   task: Task | null;
   user?: User;
+  category?: Category;
   onStatusChange: (taskId: string, newStatus: Status) => void;
   onAskAI: (task: Task) => void;
 }
@@ -38,7 +39,7 @@ const DetailItem: React.FC<{ icon: React.ReactNode; label: string; children: Rea
     </div>
 );
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onEdit, onDelete, task, user, onStatusChange, onAskAI }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onEdit, onDelete, task, user, category, onStatusChange, onAskAI }) => {
   const [isStatusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +129,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, onEd
                         {task.priority}
                     </span>
                 </DetailItem>
+                {category && (
+                    <DetailItem icon={<TagIcon className="h-4 w-4" />} label="Category">
+                        <div className="flex items-center space-x-2">
+                            <span 
+                                className="w-3 h-3 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: category.color }}
+                            ></span>
+                            <span className="font-medium">{category.name}</span>
+                        </div>
+                    </DetailItem>
+                )}
                  {task.reminderAt && (
                    <DetailItem icon={<BellIcon className="h-4 w-4" />} label="Reminder">
                         <span className="font-medium text-slate-800">

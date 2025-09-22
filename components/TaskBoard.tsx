@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { Task, User, Status } from '../types';
+import { Task, User, Status, Category } from '../types';
 import TaskCard from './TaskCard';
 
 interface TaskBoardProps {
   tasks: Task[];
   usersMap: Map<string, User>;
+  categoriesMap: Map<string, Category>;
   onViewDetails: (task: Task) => void;
   onStatusChange: (taskId: string, newStatus: Status) => void;
 }
@@ -16,7 +17,7 @@ const statusConfig: { [key in Status]: { title: string; color: string } } = {
   [Status.Done]: { title: "Done", color: "bg-green-200" },
 };
 
-const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, onViewDetails, onStatusChange }) => {
+const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, categoriesMap, onViewDetails, onStatusChange }) => {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<Status | null>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,6 +122,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, onViewDetails, o
                   key={task.id}
                   task={task}
                   user={usersMap.get(task.assigneeId)}
+                  category={task.categoryId ? categoriesMap.get(task.categoryId) : undefined}
                   onClick={() => onViewDetails(task)}
                   onDragStart={(e) => handleDragStart(e, task.id)}
                   onDragEnd={handleDragEnd}

@@ -1,11 +1,12 @@
 
 import React from 'react';
-import { Task, User, Priority } from '../types';
+import { Task, User, Priority, Category } from '../types';
 import { RefreshCwIcon } from './Icons';
 
 interface TaskCardProps {
   task: Task;
   user?: User;
+  category?: Category;
   onClick: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -59,7 +60,7 @@ export const formatDueDate = (dateString: string) => {
     return { text, color };
 };
 
-const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, onClick, onDragStart, onDragEnd, isDragging }) => {
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, category, onClick, onDragStart, onDragEnd, isDragging }) => {
   const { title, description, dueDate, priority } = task;
   const config = priorityConfig[priority];
   const { text: dateText, color: dateColor } = React.useMemo(() => formatDueDate(dueDate), [dueDate]);
@@ -87,8 +88,19 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, onClick, onD
       }`}
     >
       <div className="flex justify-between items-start">
-        <h3 className="font-semibold text-slate-800 pr-2">{title}</h3>
-         {task.isRecurring && <RefreshCwIcon className="h-4 w-4 text-slate-400 flex-shrink-0" title="Recurring Task"/>}
+        <div className="flex-1 pr-2">
+          <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
+          {category && (
+            <div className="flex items-center space-x-1 mb-1">
+              <span 
+                className="w-2 h-2 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: category.color }}
+              ></span>
+              <span className="text-xs text-slate-600 font-medium">{category.name}</span>
+            </div>
+          )}
+        </div>
+        {task.isRecurring && <RefreshCwIcon className="h-4 w-4 text-slate-400 flex-shrink-0" title="Recurring Task"/>}
       </div>
       <p className="text-sm text-slate-600 line-clamp-2">{description}</p>
       <div className="flex justify-between items-center pt-2">
@@ -113,8 +125,10 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, onClick, onD
     prevProps.task.dueDate === nextProps.task.dueDate &&
     prevProps.task.priority === nextProps.task.priority &&
     prevProps.task.status === nextProps.task.status &&
+    prevProps.task.categoryId === nextProps.task.categoryId &&
     prevProps.isDragging === nextProps.isDragging &&
-    prevProps.user?.id === nextProps.user?.id
+    prevProps.user?.id === nextProps.user?.id &&
+    prevProps.category?.id === nextProps.category?.id
   );
 });
 

@@ -148,6 +148,7 @@ export const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [categories, setCategories] = useState<Category[]>([]);
   const usersMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
+  const categoriesMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories]);
   const [currentUser, setCurrentUser] = useState<User>(() => usersMap.get(CURRENT_USER_ID)!);
   
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.Board);
@@ -442,11 +443,11 @@ export const App: React.FC = () => {
     setTaskFormOpen(true);
   };
 
-  const handleSendMessageToAI = async (message: string) => {
+  const handleSendMessageToAI = async (message: string, selectedFileIds: string[] = []) => {
     setAiChatHistory(prev => [...prev, { role: 'user', content: message }]);
     setIsAiLoading(true);
     try {
-        const response = await aiService.chat(message, aiChatHistory);
+        const response = await aiService.chat(message, aiChatHistory, selectedFileIds);
         setAiChatHistory(prev => [...prev, { role: 'model', content: response }]);
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error communicating with AI';
@@ -769,6 +770,7 @@ export const App: React.FC = () => {
             <TaskBoard
               tasks={filteredTasks}
               usersMap={usersMap}
+              categoriesMap={categoriesMap}
               onViewDetails={handleViewDetails}
               onStatusChange={handleStatusChange}
             />
@@ -776,6 +778,7 @@ export const App: React.FC = () => {
             <MonthlyView
               tasks={filteredTasks}
               usersMap={usersMap}
+              categoriesMap={categoriesMap}
               onViewDetails={handleViewDetails}
             />
           ) : currentView === ViewType.TimeManagement ? (
@@ -815,6 +818,7 @@ export const App: React.FC = () => {
         onClose={() => setTaskFormOpen(false)}
         onSave={handleSaveTask}
         users={users}
+        categories={categories}
         task={selectedTask}
       />
       <SmartTaskFormModal
@@ -829,6 +833,7 @@ export const App: React.FC = () => {
         onDelete={handleDeleteTask}
         task={selectedTask}
         user={selectedTask ? usersMap.get(selectedTask.assigneeId) : undefined}
+        category={selectedTask?.categoryId ? categoriesMap.get(selectedTask.categoryId) : undefined}
         onStatusChange={handleStatusChange}
         onAskAI={handleAskAIWithContext}
       />

@@ -1,11 +1,12 @@
 
 import React, { useState } from 'react';
-import { Task, User, Priority } from '../types';
+import { Task, User, Priority, Category } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 
 interface MonthlyViewProps {
   tasks: Task[];
   usersMap: Map<string, User>;
+  categoriesMap: Map<string, Category>;
   onViewDetails: (task: Task) => void;
 }
 
@@ -16,7 +17,7 @@ const priorityColors: { [key in Priority]: string } = {
   [Priority.Urgent]: 'bg-red-500',
 };
 
-const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, onViewDetails }) => {
+const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, categoriesMap, onViewDetails }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -81,16 +82,30 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, onViewDetail
                 {d.getDate()}
               </span>
               <div className="mt-1 space-y-1 overflow-y-auto">
-                {tasksForDay.map(task => (
-                  <button 
-                    key={task.id} 
-                    onClick={() => onViewDetails(task)} 
-                    className="w-full text-left text-xs p-1 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center space-x-1.5 truncate"
-                  >
-                    <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${priorityColors[task.priority]}`}></div>
-                    <span className="truncate text-slate-700 font-medium">{task.title}</span>
-                  </button>
-                ))}
+                {tasksForDay.map(task => {
+                  const category = task.categoryId ? categoriesMap.get(task.categoryId) : undefined;
+                  return (
+                    <button 
+                      key={task.id} 
+                      onClick={() => onViewDetails(task)} 
+                      className="w-full text-left text-xs p-1 rounded-md bg-slate-100 hover:bg-slate-200 flex flex-col space-y-0.5 truncate"
+                    >
+                      <div className="flex items-center space-x-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${priorityColors[task.priority]}`}></div>
+                        <span className="truncate text-slate-700 font-medium">{task.title}</span>
+                      </div>
+                      {category && (
+                        <div className="flex items-center space-x-1 ml-3">
+                          <div 
+                            className="w-1 h-1 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: category.color }}
+                          ></div>
+                          <span className="truncate text-slate-500 text-xs">{category.name}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Task, User, Priority, Status } from '../types';
+import { Task, User, Priority, Status, Category } from '../types';
 import { CloseIcon, RefreshCwIcon } from './Icons';
 
 interface TaskFormModalProps {
@@ -8,16 +8,18 @@ interface TaskFormModalProps {
   onClose: () => void;
   onSave: (task: Omit<Task, 'id'> | Task) => void;
   users: User[];
+  categories: Category[];
   task: Task | null;
 }
 
 type RecurrenceRule = 'daily' | 'weekly' | 'monthly';
 
-const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, users, task }) => {
+const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, users, categories, task }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     assigneeId: '',
+    categoryId: '',
     dueDate: '',
     priority: Priority.Medium,
     status: Status.ToDo,
@@ -43,6 +45,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         title: task.title,
         description: task.description,
         assigneeId: task.assigneeId,
+        categoryId: task.categoryId || '',
         dueDate: task.dueDate,
         priority: task.priority,
         status: task.status,
@@ -67,6 +70,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
         title: '',
         description: '',
         assigneeId: users[0]?.id || '',
+        categoryId: categories[0]?.id || '',
         dueDate: today,
         priority: Priority.Medium,
         status: Status.ToDo,
@@ -133,6 +137,19 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSave, 
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
+                <div>
+                    <label htmlFor="categoryId" className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                    <select name="categoryId" id="categoryId" value={formData.categoryId} onChange={handleChange} className="w-full border-slate-300 rounded-md shadow-sm focus:ring-brand-500 focus:border-brand-500">
+                        <option value="">No Category</option>
+                        {categories.map(c => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
                  <div>
                     <label htmlFor="dueDate" className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
                     <input type="date" name="dueDate" id="dueDate" value={formData.dueDate} onChange={handleChange} required className="w-full border-slate-300 rounded-md shadow-sm focus:ring-brand-500 focus:border-brand-500" />

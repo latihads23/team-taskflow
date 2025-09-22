@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { aiService, AISettings, AIProvider } from '../services/aiService';
+import { aiService, AISettings, AIProvider, ExpertDomain, EXPERT_PROMPTS } from '../services/aiService';
 
 interface AISettingsProps {
   isOpen: boolean;
@@ -162,6 +162,125 @@ const AISettingsComponent: React.FC<AISettingsProps> = ({ isOpen, onClose }) => 
             </label>
           </div>
 
+          {/* Assistant Mode */}
+          <div>
+            <h4 className="text-lg font-semibold text-slate-800 mb-3">Assistant Mode</h4>
+            <div className="space-y-3">
+              <label className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="general"
+                  checked={settings.mode === 'general'}
+                  onChange={() => setSettings(prev => ({ ...prev, mode: 'general' }))}
+                  className="mr-3"
+                />
+                <div>
+                  <span className="font-medium text-slate-800">🧠 General Knowledge</span>
+                  <p className="text-sm text-slate-600">Broad expertise across many domains - good for general questions and tasks</p>
+                </div>
+              </label>
+
+              <label className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="expert"
+                  checked={settings.mode === 'expert'}
+                  onChange={() => setSettings(prev => ({ ...prev, mode: 'expert' }))}
+                  className="mr-3"
+                />
+                <div>
+                  <span className="font-medium text-slate-800">👨‍💼 Expert Mode</span>
+                  <p className="text-sm text-slate-600">Specialized knowledge in specific domains - choose your expert below</p>
+                </div>
+              </label>
+            </div>
+
+            {settings.mode === 'expert' && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Expert Domain
+                </label>
+                <select
+                  value={settings.expertDomain}
+                  onChange={(e) => setSettings(prev => ({ ...prev, expertDomain: e.target.value as ExpertDomain }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="business">👔 Business & Strategy</option>
+                  <option value="tech">💻 Technology & Programming</option>
+                  <option value="marketing">📢 Marketing & Growth</option>
+                  <option value="design">🎨 Design & User Experience</option>
+                  <option value="finance">💰 Finance & Investment</option>
+                  <option value="legal">⚖️ Legal & Compliance</option>
+                  <option value="medical">🏥 Medical & Healthcare</option>
+                  <option value="education">📚 Education & Learning</option>
+                  <option value="engineering">🔧 Engineering & Technical</option>
+                  <option value="research">🔬 Research & Analysis</option>
+                  <option value="writing">✍️ Writing & Communication</option>
+                  <option value="data-analysis">📊 Data Analysis & Statistics</option>
+                  <option value="project-management">📋 Project Management</option>
+                </select>
+                <div className="mt-2 p-2 bg-white rounded border text-xs text-slate-600">
+                  <strong>Expert Context:</strong> {EXPERT_PROMPTS[settings.expertDomain]}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Custom Instructions */}
+          <div>
+            <h4 className="text-lg font-semibold text-slate-800 mb-3">Custom Instructions</h4>
+            <textarea
+              value={settings.customInstructions}
+              onChange={(e) => setSettings(prev => ({ ...prev, customInstructions: e.target.value }))}
+              placeholder="Add custom instructions for the AI assistant (optional)..."
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              These instructions will be added to every conversation to customize the AI's behavior
+            </p>
+          </div>
+
+          {/* File Upload Settings */}
+          <div>
+            <h4 className="text-lg font-semibold text-slate-800 mb-3">File Upload Settings</h4>
+            <div className="space-y-4">
+              <label className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={settings.enableFileUploads}
+                  onChange={() => setSettings(prev => ({ ...prev, enableFileUploads: !prev.enableFileUploads }))}
+                  className="mr-3"
+                />
+                <div>
+                  <span className="font-medium text-slate-800">📁 Enable File Uploads</span>
+                  <p className="text-sm text-slate-600">Allow uploading PDF, images, documents, and presentations</p>
+                </div>
+              </label>
+
+              {settings.enableFileUploads && (
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Maximum File Size (MB)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={settings.maxFileSize}
+                    onChange={(e) => setSettings(prev => ({ ...prev, maxFileSize: parseInt(e.target.value) || 10 }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                  />
+                  <div className="mt-2 text-xs text-slate-600">
+                    <strong>Supported formats:</strong> PDF, Images (JPG, PNG, GIF), Word (DOC, DOCX), PowerPoint (PPT, PPTX), Text (TXT, CSV)
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Model Settings */}
           <div>
             <h4 className="text-lg font-semibold text-slate-800 mb-3">Model Configuration</h4>
@@ -190,8 +309,9 @@ const AISettingsComponent: React.FC<AISettingsProps> = ({ isOpen, onClose }) => 
                   onChange={(e) => handleModelChange('gemini', e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="gemini-pro">Gemini Pro</option>
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast & Free)</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (More Capable)</option>
+                  <option value="gemini-pro">Gemini Pro (Legacy)</option>
                 </select>
               </div>
             </div>
@@ -202,8 +322,12 @@ const AISettingsComponent: React.FC<AISettingsProps> = ({ isOpen, onClose }) => 
             <h4 className="text-sm font-semibold text-slate-800 mb-2">Current Configuration</h4>
             <div className="text-sm text-slate-600 space-y-1">
               <p><strong>Primary:</strong> {settings.primaryProvider === 'openai' ? 'OpenAI' : 'Gemini'} ({settings.primaryProvider === 'openai' ? settings.openaiModel : settings.geminiModel})</p>
+              <p><strong>Mode:</strong> {settings.mode === 'expert' ? `🎯 Expert (${settings.expertDomain})` : '🧠 General Knowledge'}</p>
               <p><strong>Fallback:</strong> {settings.enableFallback ? 'Enabled' : 'Disabled'}</p>
-              <p><strong>Secondary:</strong> {settings.primaryProvider === 'openai' ? 'Gemini' : 'OpenAI'} (auto-fallback)</p>
+              <p><strong>File Uploads:</strong> {settings.enableFileUploads ? `Enabled (${settings.maxFileSize}MB max)` : 'Disabled'}</p>
+              {settings.customInstructions && (
+                <p><strong>Custom Instructions:</strong> {settings.customInstructions.length > 50 ? settings.customInstructions.substring(0, 50) + '...' : settings.customInstructions}</p>
+              )}
             </div>
           </div>
 
