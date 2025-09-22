@@ -18,7 +18,9 @@ import { authService } from './services/authService';
 // New imports for enhanced features
 import UserManagement from './components/admin/UserManagement';
 import CategoryManagement from './components/CategoryManagement';
+import AISettingsComponent from './components/AISettings';
 import { userService, categoryService, taskService, timeEntryService, timeBoxService } from './services/hybridStorage';
+import { aiService } from './services/aiService';
 
 // Mock Data for Users (can be moved to Supabase Auth later)
 const MOCK_USERS: User[] = [
@@ -163,6 +165,7 @@ export const App: React.FC = () => {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isActivityFeedOpen, setActivityFeedOpen] = useState(false);
   const [isUserProfileOpen, setUserProfileOpen] = useState(false);
+  const [isAISettingsOpen, setAISettingsOpen] = useState(false);
 
   // Time Management state
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
@@ -334,7 +337,7 @@ export const App: React.FC = () => {
   
   const handleAddSmartTask = async (prompt: string) => {
     try {
-        const parsedTask = await parseTaskFromString(prompt, users);
+        const parsedTask = await aiService.parseTask(prompt, users);
         if (parsedTask) {
             // Create complete TaskData with timestamps
             const taskData: TaskData = {
@@ -350,8 +353,9 @@ export const App: React.FC = () => {
             addToast("AI couldn't determine a user. Please check your prompt.", 'warning');
         }
     } catch (error) {
-        console.error(error);
-        addToast("Failed to add smart task. Please try again.", 'warning');
+        console.error('Smart Task Error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to add smart task';
+        addToast(errorMessage, 'warning');
     }
   };
 
@@ -442,10 +446,12 @@ export const App: React.FC = () => {
     setAiChatHistory(prev => [...prev, { role: 'user', content: message }]);
     setIsAiLoading(true);
     try {
-        const response = await chatWithAI(message);
+        const response = await aiService.chat(message, aiChatHistory);
         setAiChatHistory(prev => [...prev, { role: 'model', content: response }]);
     } catch (error) {
-        addToast("Error communicating with AI.", "warning");
+        const errorMessage = error instanceof Error ? error.message : 'Error communicating with AI';
+        addToast(errorMessage, "warning");
+        console.error('AI Chat Error:', error);
     } finally {
         setIsAiLoading(false);
     }
@@ -464,7 +470,7 @@ export const App: React.FC = () => {
   };
 
   const handleClearChat = () => {
-    resetChat();
+    aiService.resetChat();
     setAiChatHistory([]);
     setAiTaskContext(null);
     addToast("AI chat history cleared.", "info");
@@ -749,6 +755,7 @@ export const App: React.FC = () => {
         onToggleActivityFeed={() => setActivityFeedOpen(prev => !prev)}
         currentUser={currentUser}
         onOpenProfile={() => setUserProfileOpen(true)}
+        onOpenAISettings={() => setAISettingsOpen(true)}
         users={users}
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -845,6 +852,10 @@ export const App: React.FC = () => {
         isOpen={isActivityFeedOpen}
         onClose={() => setActivityFeedOpen(false)}
         logs={activityLogs}
+      />
+      <AISettingsComponent
+        isOpen={isAISettingsOpen}
+        onClose={() => setAISettingsOpen(false)}
       />
       <ToastContainer toasts={toasts} />
     </div>

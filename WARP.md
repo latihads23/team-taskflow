@@ -261,6 +261,7 @@ npm run preview
 ```bash
 # Development (.env)
 VITE_GEMINI_API_KEY=         # Gemini AI API key
+VITE_OPENAI_API_KEY=         # OpenAI API key for GPT models
 VITE_SUPABASE_URL=          # Supabase project URL
 VITE_SUPABASE_ANON_KEY=     # Supabase anonymous key
 ```
@@ -345,12 +346,32 @@ const MOCK_USERS = [
 - Task assignment
 - Activity tracking
 
+### Demo Login Credentials
+```
+👤 Admin Account:
+  Email: latihads@gmail.com
+  Password: 123
+  Name: Administrator
+  Role: admin (full access)
+
+👥 User Accounts:
+  Email: alex.johnson@example.com
+  Password: password123
+  Name: Alex Johnson
+  Role: user
+  
+  Email: maria.garcia@example.com
+  Password: password123
+  Name: Maria Garcia
+  Role: user
+```
+
 ## 📝 Development Notes
 
 ### Setup Date: 2025-09-08
-### Last Updated: 2025-09-21
+### Last Updated: 2025-09-22
 ### Status: Production Ready + Enhanced Features
-### Version: 1.1.0 (Enhanced User Management & Time Integration)
+### Version: 1.1.1 (Latest Enhancements & Fixes)
 
 ### Build Info
 - Dependencies: Updated dengan Supabase & lucide-react
@@ -363,7 +384,8 @@ const MOCK_USERS = [
 - User/Category Management: ✅
 - Real-time subscriptions: ✅
 
-### Recent Improvements (2025-09-21)
+### Recent Improvements (2025-09-22)
+- 🚀 **Version 1.1.1 Release** - Latest enhancement deployment completed
 - 📱 **Enhanced User Management** - Added phone number field to user profiles
 - 🔄 **Time Management Integration** - Eat That Frog fully integrated into Time Management dashboard
 - 💾 **Database Services** - Added comprehensive time entry and time box services
@@ -371,6 +393,8 @@ const MOCK_USERS = [
 - 🔧 **Code Quality** - Fixed UserManagement component compilation issues
 - 📊 **Storage Enhancement** - Extended fallback storage with time management support
 - 🎆 **Production Ready** - Full compilation success, all features tested
+- ✅ **Git Integration** - Successfully committed and pushed to GitHub repository
+- 🔄 **Documentation Updated** - WARP.md synchronized with latest codebase changes
 
 ## 🚀 Quick Start Guide
 
@@ -383,7 +407,8 @@ npm install
 ### 2. Environment Setup
 Create `.env` file dengan:
 ```bash
-VITE_GEMINI_API_KEY=your_key_here
+VITE_GEMINI_API_KEY=your_gemini_key_here
+VITE_OPENAI_API_KEY=your_openai_key_here
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```

@@ -8,8 +8,8 @@ const TEST_ACCOUNTS: Array<{ email: string; password: string; user: AuthUser }> 
     user: {
       id: 'auth1',
       email: 'latihads@gmail.com',
-      name: 'Haris Latifa',
-      avatarUrl: 'https://i.pravatar.cc/150?u=latihads',
+      name: 'Administrator',
+      avatarUrl: 'https://i.pravatar.cc/150?u=admin',
       role: 'admin'
     }
   },
