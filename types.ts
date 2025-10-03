@@ -58,6 +58,13 @@ export interface Category {
   name: string;
   color: string;
   description?: string;
+  // Hierarchical category support
+  type: 'main' | 'sub';
+  parentId?: string; // For sub-categories, points to main category
+  mainCategoryColor?: string; // Background color for the entire task card
+  icon?: string; // Emoji or icon for the category
+  order?: number; // Display order
+  isActive: boolean;
   createdBy: string; // user ID
   createdAt: string;
   updatedAt: string;

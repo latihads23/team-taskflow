@@ -1,204 +1,232 @@
--- ============================================
--- TEAM TASKFLOW - COMPLETE DATABASE SCHEMA
--- ============================================
--- This script creates all tables needed for the Team TaskFlow application
--- Run this in your Supabase SQL Editor
+-- =============================================
+-- TEAM TASKFLOW - COMPLETE SUPABASE SCHEMA v2.0
+-- =============================================
+-- 🚀 Run this script in your Supabase SQL Editor
+-- Dashboard > SQL Editor > New Query > Paste & Run
 
--- Enable necessary extensions
+-- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
--- ============================================
+-- =============================================
+-- DROP EXISTING TABLES (IF RECREATING)
+-- =============================================
+-- Uncomment below if you want to recreate everything
+-- DROP TABLE IF EXISTS activity_logs CASCADE;
+-- DROP TABLE IF EXISTS notifications CASCADE;
+-- DROP TABLE IF EXISTS user_preferences CASCADE;
+-- DROP TABLE IF EXISTS time_entries CASCADE;
+-- DROP TABLE IF EXISTS task_comments CASCADE;
+-- DROP TABLE IF EXISTS tasks CASCADE;
+-- DROP TABLE IF EXISTS categories CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;
+
+-- =============================================
 -- 1. USERS TABLE
--- ============================================
--- Store user profiles and information
+-- =============================================
 CREATE TABLE IF NOT EXISTS users (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  avatar_url TEXT,
-  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    avatar_url TEXT DEFAULT 'https://i.pravatar.cc/150?img=1',
+    role VARCHAR(50) DEFAULT 'member' CHECK (role IN ('admin', 'manager', 'member')),
+    department VARCHAR(100),
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ============================================
--- 2. AUTH_USERS TABLE 
--- ============================================
--- Store authentication credentials (simplified for demo)
--- In production, you'd use Supabase Auth instead
-CREATE TABLE IF NOT EXISTS auth_users (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL, -- In production, use proper hashing
-  is_active BOOLEAN DEFAULT true,
-  last_login TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- =============================================
+-- 2. CATEGORIES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS categories (
+    id VARCHAR(50) PRIMARY KEY, -- Using string ID for easier frontend integration
+    name VARCHAR(100) NOT NULL,
+    color VARCHAR(7) NOT NULL, -- Hex color #ffffff
+    description TEXT,
+    icon VARCHAR(10), -- Emoji
+    type VARCHAR(20) DEFAULT 'main' CHECK (type IN ('main', 'sub')),
+    parent_id VARCHAR(50) REFERENCES categories(id) ON DELETE CASCADE,
+    main_category_color VARCHAR(7),
+    "order" INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ============================================
--- 3. TASKS TABLE
--- ============================================
--- Main tasks with all features: recurring, priorities, etc.
+-- =============================================
+-- 3. ENHANCED TASKS TABLE
+-- =============================================
 CREATE TABLE IF NOT EXISTS tasks (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  assignee_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  due_date DATE NOT NULL,
-  priority TEXT NOT NULL CHECK (priority IN ('Low', 'Medium', 'High', 'Urgent')),
-  status TEXT NOT NULL CHECK (status IN ('To Do', 'In Progress', 'Done')),
-  reminder_at TIMESTAMP WITH TIME ZONE,
-  is_recurring BOOLEAN DEFAULT FALSE,
-  recurrence_rule TEXT CHECK (recurrence_rule IN ('daily', 'weekly', 'monthly') OR recurrence_rule IS NULL),
-  recurrence_end_date DATE,
-  original_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    assignee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    category_id VARCHAR(50) REFERENCES categories(id) ON DELETE SET NULL,
+    
+    -- Core fields
+    due_date DATE NOT NULL,
+    priority VARCHAR(20) DEFAULT 'Medium' CHECK (priority IN ('Low', 'Medium', 'High', 'Urgent')),
+    status VARCHAR(20) DEFAULT 'To Do' CHECK (status IN ('To Do', 'In Progress', 'Review', 'Done')),
+    
+    -- Time tracking
+    estimated_hours INTEGER DEFAULT 0,
+    actual_hours INTEGER DEFAULT 0,
+    
+    -- Reminders  
+    reminder_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Recurring tasks
+    is_recurring BOOLEAN DEFAULT false,
+    recurrence_rule VARCHAR(100), -- 'daily', 'weekly', 'monthly'
+    recurrence_end_date DATE,
+    original_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    
+    -- Special features
+    eat_that_frog BOOLEAN DEFAULT false,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Search
+    search_vector tsvector,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ============================================
--- 4. ACTIVITY_LOGS TABLE
--- ============================================
--- Track all user activities and system events
-CREATE TABLE IF NOT EXISTS activity_logs (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  action TEXT NOT NULL, -- 'created', 'updated', 'deleted', 'status_changed', etc.
-  message TEXT NOT NULL,
-  details JSONB, -- Store additional context as JSON
-  ip_address INET,
-  user_agent TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 5. CHAT_MESSAGES TABLE
--- ============================================
--- Store AI chat history for each user
-CREATE TABLE IF NOT EXISTS chat_messages (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE, -- Optional task context
-  role TEXT NOT NULL CHECK (role IN ('user', 'model')),
-  content TEXT NOT NULL,
-  session_id UUID, -- Group messages by chat session
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 6. USER_PREFERENCES TABLE
--- ============================================
--- Store user settings and preferences
-CREATE TABLE IF NOT EXISTS user_preferences (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-  theme TEXT DEFAULT 'light' CHECK (theme IN ('light', 'dark')),
-  default_view TEXT DEFAULT 'board' CHECK (default_view IN ('board', 'calendar')),
-  notifications_enabled BOOLEAN DEFAULT true,
-  email_notifications BOOLEAN DEFAULT false,
-  timezone TEXT DEFAULT 'UTC',
-  language TEXT DEFAULT 'en',
-  preferences JSONB DEFAULT '{}', -- Store additional preferences as JSON
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 7. TASK_COMMENTS TABLE
--- ============================================
--- Comments and notes on tasks
+-- =============================================
+-- 4. TASK COMMENTS
+-- =============================================
 CREATE TABLE IF NOT EXISTS task_comments (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  is_internal BOOLEAN DEFAULT false, -- Internal notes vs public comments
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ============================================
--- 8. TASK_ATTACHMENTS TABLE
--- ============================================
--- File attachments for tasks
-CREATE TABLE IF NOT EXISTS task_attachments (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  filename TEXT NOT NULL,
-  file_path TEXT NOT NULL, -- Path in storage bucket
-  file_size BIGINT,
-  mime_type TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- =============================================
+-- 5. TIME ENTRIES (Pomodoro & Time Tracking)
+-- =============================================
+CREATE TABLE IF NOT EXISTS time_entries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE,
+    duration_minutes INTEGER,
+    description TEXT,
+    entry_type VARCHAR(20) DEFAULT 'work' CHECK (entry_type IN ('work', 'break', 'pomodoro')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ============================================
--- INDEXES FOR PERFORMANCE
--- ============================================
+-- =============================================
+-- 6. NOTIFICATIONS
+-- =============================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+    type VARCHAR(50) DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'error', 'reminder')),
+    is_read BOOLEAN DEFAULT false,
+    action_url TEXT,
+    related_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- Users indexes
+-- =============================================
+-- 7. USER PREFERENCES
+-- =============================================
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- UI Preferences
+    theme VARCHAR(20) DEFAULT 'light' CHECK (theme IN ('light', 'dark', 'auto')),
+    language VARCHAR(10) DEFAULT 'id',
+    timezone VARCHAR(50) DEFAULT 'Asia/Jakarta',
+    
+    -- Notifications
+    email_notifications BOOLEAN DEFAULT true,
+    push_notifications BOOLEAN DEFAULT true,
+    daily_digest BOOLEAN DEFAULT true,
+    reminder_minutes_before INTEGER DEFAULT 30,
+    
+    -- Dashboard
+    dashboard_layout JSONB DEFAULT '{"view": "kanban", "columns": ["To Do", "In Progress", "Review", "Done"]}',
+    default_priority VARCHAR(20) DEFAULT 'Medium',
+    
+    -- Pomodoro settings
+    pomodoro_work_minutes INTEGER DEFAULT 25,
+    pomodoro_short_break INTEGER DEFAULT 5,
+    pomodoro_long_break INTEGER DEFAULT 15,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- 8. ACTIVITY LOGS
+-- =============================================
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id UUID,
+    description TEXT,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- PERFORMANCE INDEXES
+-- =============================================
+
+-- Users
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active) WHERE is_active = true;
 
--- Tasks indexes  
-CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id ON tasks(assignee_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
-CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+-- Tasks (comprehensive indexing)
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id) WHERE assignee_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks(category_id) WHERE category_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
-CREATE INDEX IF NOT EXISTS idx_tasks_original_task_id ON tasks(original_task_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_is_recurring ON tasks(is_recurring);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks(created_by);
+CREATE INDEX IF NOT EXISTS idx_tasks_recurring ON tasks(is_recurring) WHERE is_recurring = true;
+CREATE INDEX IF NOT EXISTS idx_tasks_frog ON tasks(eat_that_frog) WHERE eat_that_frog = true;
+CREATE INDEX IF NOT EXISTS idx_tasks_search ON tasks USING GIN(search_vector);
 
--- Activity logs indexes
-CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_task_id ON activity_logs(task_id);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at DESC);
+-- Composite indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status ON tasks(assignee_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_priority ON tasks(due_date, priority);
 
--- Chat messages indexes
-CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_task_id ON chat_messages(task_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
+-- Categories
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active) WHERE is_active = true;
 
--- Task comments indexes
-CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_comments_user_id ON task_comments(user_id);
-CREATE INDEX IF NOT EXISTS idx_task_comments_created_at ON task_comments(created_at DESC);
+-- Other tables
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_task_user ON time_entries(task_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_start_time ON time_entries(start_time);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_created ON activity_logs(user_id, created_at);
 
--- ============================================
--- ROW LEVEL SECURITY (RLS)
--- ============================================
+-- =============================================
+-- TRIGGERS & FUNCTIONS
+-- =============================================
 
--- Enable RLS on all tables
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_attachments ENABLE ROW LEVEL SECURITY;
-
--- Create permissive policies for development (you can make these more restrictive later)
-CREATE POLICY "Enable all operations for all users" ON users FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all auth_users" ON auth_users FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all tasks" ON tasks FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all activity_logs" ON activity_logs FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all chat_messages" ON chat_messages FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all user_preferences" ON user_preferences FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all task_comments" ON task_comments FOR ALL USING (true);
-CREATE POLICY "Enable all operations for all task_attachments" ON task_attachments FOR ALL USING (true);
-
--- ============================================
--- TRIGGERS FOR UPDATED_AT
--- ============================================
-
--- Create updated_at trigger function
+-- Update timestamp function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -207,153 +235,245 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Apply triggers to tables with updated_at columns
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Apply update triggers
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_task_comments_updated_at BEFORE UPDATE ON task_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_auth_users_updated_at BEFORE UPDATE ON auth_users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Search vector update function
+CREATE OR REPLACE FUNCTION update_task_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.search_vector = to_tsvector('indonesian', COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.description, ''));
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
 
-CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_task_search_vector_trigger 
+    BEFORE INSERT OR UPDATE ON tasks 
+    FOR EACH ROW EXECUTE FUNCTION update_task_search_vector();
 
-CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- =============================================
+-- ROW LEVEL SECURITY (RLS)
+-- =============================================
 
-CREATE TRIGGER update_task_comments_updated_at BEFORE UPDATE ON task_comments
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Enable RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 
--- ============================================
+-- Basic RLS Policies (customize based on your auth setup)
+-- For development, allowing all operations
+CREATE POLICY "Enable all operations for authenticated users" ON users FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON categories FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON tasks FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON task_comments FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON time_entries FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON notifications FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON user_preferences FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all operations for authenticated users" ON activity_logs FOR ALL USING (auth.role() = 'authenticated');
+
+-- =============================================
+-- UTILITY FUNCTIONS
+-- =============================================
+
+-- Get tasks with full details
+CREATE OR REPLACE FUNCTION get_tasks_with_details()
+RETURNS TABLE (
+    id UUID,
+    title TEXT,
+    description TEXT,
+    assignee_id UUID,
+    assignee_name TEXT,
+    assignee_email TEXT,
+    assignee_avatar TEXT,
+    category_id TEXT,
+    category_name TEXT,
+    category_color TEXT,
+    category_icon TEXT,
+    due_date DATE,
+    priority TEXT,
+    status TEXT,
+    is_recurring BOOLEAN,
+    eat_that_frog BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        t.id, t.title, t.description, t.assignee_id,
+        u.name as assignee_name, u.email as assignee_email, u.avatar_url as assignee_avatar,
+        t.category_id, c.name as category_name, c.color as category_color, c.icon as category_icon,
+        t.due_date, t.priority, t.status, t.is_recurring, t.eat_that_frog,
+        t.created_at, t.updated_at
+    FROM tasks t
+    LEFT JOIN users u ON t.assignee_id = u.id
+    LEFT JOIN categories c ON t.category_id = c.id
+    ORDER BY t.due_date ASC, 
+             CASE t.priority 
+                WHEN 'Urgent' THEN 1
+                WHEN 'High' THEN 2  
+                WHEN 'Medium' THEN 3
+                WHEN 'Low' THEN 4
+             END ASC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Get user statistics
+CREATE OR REPLACE FUNCTION get_user_stats(user_uuid UUID)
+RETURNS TABLE (
+    total_tasks INTEGER,
+    completed_tasks INTEGER,
+    pending_tasks INTEGER,
+    overdue_tasks INTEGER,
+    completion_rate DECIMAL,
+    total_time_minutes INTEGER,
+    frogs_eaten INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(*)::INTEGER as total_tasks,
+        COUNT(CASE WHEN t.status = 'Done' THEN 1 END)::INTEGER as completed_tasks,
+        COUNT(CASE WHEN t.status != 'Done' THEN 1 END)::INTEGER as pending_tasks,
+        COUNT(CASE WHEN t.status != 'Done' AND t.due_date < CURRENT_DATE THEN 1 END)::INTEGER as overdue_tasks,
+        CASE 
+            WHEN COUNT(*) > 0 THEN 
+                ROUND((COUNT(CASE WHEN t.status = 'Done' THEN 1 END)::DECIMAL / COUNT(*)::DECIMAL) * 100, 2)
+            ELSE 0 
+        END as completion_rate,
+        COALESCE(SUM(te.duration_minutes), 0)::INTEGER as total_time_minutes,
+        COUNT(CASE WHEN t.eat_that_frog = true AND t.status = 'Done' THEN 1 END)::INTEGER as frogs_eaten
+    FROM tasks t
+    LEFT JOIN time_entries te ON t.id = te.task_id
+    WHERE t.assignee_id = user_uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
 -- SAMPLE DATA
--- ============================================
+-- =============================================
 
 -- Insert sample users
-INSERT INTO users (id, name, email, avatar_url, role) VALUES 
-('00000000-0000-0000-0000-000000000001', 'Alex Johnson', 'alex.johnson@example.com', 'https://i.pravatar.cc/150?u=u1', 'admin'),
-('00000000-0000-0000-0000-000000000002', 'Maria Garcia', 'maria.garcia@example.com', 'https://i.pravatar.cc/150?u=u2', 'user'),
-('00000000-0000-0000-0000-000000000003', 'James Smith', 'james.smith@example.com', 'https://i.pravatar.cc/150?u=u3', 'user'),
-('00000000-0000-0000-0000-000000000004', 'Li Wei', 'li.wei@example.com', 'https://i.pravatar.cc/150?u=u4', 'user')
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, name, email, avatar_url, role, department) VALUES
+('00000000-0000-0000-0000-000000000001', 'Alex Johnson', 'alex@teamtaskflow.com', 'https://i.pravatar.cc/150?img=1', 'admin', 'Management'),
+('00000000-0000-0000-0000-000000000002', 'Sarah Wilson', 'sarah@teamtaskflow.com', 'https://i.pravatar.cc/150?img=2', 'manager', 'Development'),
+('00000000-0000-0000-0000-000000000003', 'Mike Chen', 'mike@teamtaskflow.com', 'https://i.pravatar.cc/150?img=3', 'member', 'Development'),
+('00000000-0000-0000-0000-000000000004', 'Emma Davis', 'emma@teamtaskflow.com', 'https://i.pravatar.cc/150?img=4', 'member', 'Design')
+ON CONFLICT (id) DO NOTHING;
 
--- Insert sample auth credentials (password is 'password123' - use proper hashing in production)
-INSERT INTO auth_users (user_id, email, password_hash) VALUES 
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 'alex.johnson@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'),
-((SELECT id FROM users WHERE email = 'maria.garcia@example.com'), 'maria.garcia@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'),
-((SELECT id FROM users WHERE email = 'james.smith@example.com'), 'james.smith@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'),
-((SELECT id FROM users WHERE email = 'li.wei@example.com'), 'li.wei@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi')
-ON CONFLICT (email) DO NOTHING;
+-- Insert sample categories
+INSERT INTO categories (id, name, color, description, icon, type, parent_id, "order", created_by) VALUES
+-- Main Categories
+('cat-main-kerjaan', 'Kerjaan', '#3B82F6', 'Semua tugas terkait pekerjaan', '🏢', 'main', NULL, 1, '00000000-0000-0000-0000-000000000001'),
+('cat-main-personal', 'Personal', '#EC4899', 'Tugas-tugas pribadi', '🏠', 'main', NULL, 2, '00000000-0000-0000-0000-000000000001'),
+
+-- Work Subcategories
+('cat-sub-meeting', 'Meeting Customer', '#60A5FA', 'Meeting dan komunikasi dengan client', '👥', 'sub', 'cat-main-kerjaan', 1, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-imers', 'Imers', '#10B981', 'Tugas imers dan proyek khusus', '💰', 'sub', 'cat-main-kerjaan', 2, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-development', 'Development', '#8B5CF6', 'Coding, development, dan technical tasks', '🔧', 'sub', 'cat-main-kerjaan', 3, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-admin', 'Admin', '#F59E0B', 'Administrative tasks dan dokumentasi', '📊', 'sub', 'cat-main-kerjaan', 4, '00000000-0000-0000-0000-000000000001'),
+
+-- Personal Subcategories
+('cat-sub-olahraga', 'Olahraga', '#EF4444', 'Aktivitas fisik dan kesehatan', '🏃‍♂️', 'sub', 'cat-main-personal', 1, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-belajar', 'Belajar', '#6366F1', 'Learning dan self improvement', '📚', 'sub', 'cat-main-personal', 2, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-masak', 'Masak', '#FACC15', 'Memasak dan urusan dapur', '🍳', 'sub', 'cat-main-personal', 3, '00000000-0000-0000-0000-000000000001'),
+('cat-sub-hobi', 'Hobi', '#14B8A6', 'Hobi dan aktivitas rekreasi', '🎮', 'sub', 'cat-main-personal', 4, '00000000-0000-0000-0000-000000000001')
+ON CONFLICT (id) DO NOTHING;
 
 -- Insert sample tasks
-INSERT INTO tasks (title, description, assignee_id, created_by, due_date, priority, status) VALUES 
-('Setup Project Environment', 'Configure development environment and initialize project repository', 
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- '2025-09-12', 'High', 'In Progress'),
-
-('Design User Interface', 'Create mockups and wireframes for the main application interface', 
- (SELECT id FROM users WHERE email = 'maria.garcia@example.com'),
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- '2025-09-14', 'Medium', 'To Do'),
-
-('Implement Authentication', 'Set up user login and registration functionality', 
- (SELECT id FROM users WHERE email = 'james.smith@example.com'),
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- '2025-09-15', 'High', 'To Do'),
-
-('Database Migration', 'Migrate from Firebase to Supabase database', 
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- '2025-09-11', 'Urgent', 'Done'),
-
-('AI Integration Testing', 'Test Gemini AI integration with task parsing', 
- (SELECT id FROM users WHERE email = 'li.wei@example.com'),
- (SELECT id FROM users WHERE email = 'alex.johnson@example.com'),
- '2025-09-13', 'Medium', 'To Do');
+INSERT INTO tasks (title, description, assignee_id, created_by, category_id, due_date, priority, status, eat_that_frog) VALUES
+('Setup Team TaskFlow Database', 'Configure Supabase database dengan schema lengkap dan sample data', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'cat-sub-development', CURRENT_DATE + INTERVAL '2 days', 'High', 'In Progress', true),
+('Client Meeting - Q4 Planning', 'Quarterly planning meeting dengan major client untuk review progress', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'cat-sub-meeting', CURRENT_DATE + INTERVAL '5 days', 'Urgent', 'To Do', true),
+('UI/UX Design Review', 'Review dan approve new dashboard designs untuk better user experience', '00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002', 'cat-sub-development', CURRENT_DATE + INTERVAL '3 days', 'Medium', 'To Do', false),
+('Morning Workout', 'Daily exercise routine - 30 menit cardio dan strength training', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'cat-sub-olahraga', CURRENT_DATE + INTERVAL '1 day', 'Medium', 'To Do', false),
+('Learn Advanced React', 'Study React hooks, context, dan performance optimization techniques', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'cat-sub-belajar', CURRENT_DATE + INTERVAL '7 days', 'Low', 'To Do', false),
+('Masak Menu Sehat', 'Prep meal untuk seminggu - focus pada protein dan sayuran', '00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000004', 'cat-sub-masak', CURRENT_DATE + INTERVAL '2 days', 'Low', 'To Do', false)
+ON CONFLICT DO NOTHING;
 
 -- Insert sample user preferences
-INSERT INTO user_preferences (user_id, theme, default_view, notifications_enabled) VALUES 
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 'dark', 'board', true),
-((SELECT id FROM users WHERE email = 'maria.garcia@example.com'), 'light', 'calendar', true),
-((SELECT id FROM users WHERE email = 'james.smith@example.com'), 'light', 'board', false),
-((SELECT id FROM users WHERE email = 'li.wei@example.com'), 'dark', 'board', true)
+INSERT INTO user_preferences (user_id, theme, dashboard_layout, pomodoro_work_minutes) VALUES
+('00000000-0000-0000-0000-000000000001', 'light', '{"view": "kanban", "columns": ["To Do", "In Progress", "Review", "Done"]}', 25),
+('00000000-0000-0000-0000-000000000002', 'dark', '{"view": "list", "columns": ["To Do", "In Progress", "Done"]}', 30),
+('00000000-0000-0000-0000-000000000003', 'light', '{"view": "calendar", "columns": ["To Do", "In Progress", "Review", "Done"]}', 25),
+('00000000-0000-0000-0000-000000000004', 'auto', '{"view": "kanban", "columns": ["To Do", "In Progress", "Done"]}', 20)
 ON CONFLICT (user_id) DO NOTHING;
 
--- Insert sample activity logs
-INSERT INTO activity_logs (user_id, task_id, action, message) VALUES 
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 
- (SELECT id FROM tasks WHERE title = 'Database Migration' LIMIT 1),
- 'created', 'Created task "Database Migration"'),
+-- =============================================
+-- VIEWS FOR COMMON QUERIES
+-- =============================================
 
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 
- (SELECT id FROM tasks WHERE title = 'Database Migration' LIMIT 1),
- 'status_changed', 'Moved task "Database Migration" to Done'),
-
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 
- (SELECT id FROM tasks WHERE title = 'Setup Project Environment' LIMIT 1),
- 'created', 'Created task "Setup Project Environment"'),
-
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 
- (SELECT id FROM tasks WHERE title = 'Design User Interface' LIMIT 1),
- 'created', 'Created task "Design User Interface"'),
-
-((SELECT id FROM users WHERE email = 'alex.johnson@example.com'), 
- (SELECT id FROM tasks WHERE title = 'Implement Authentication' LIMIT 1),
- 'created', 'Created task "Implement Authentication"');
-
--- ============================================
--- USEFUL VIEWS FOR QUERIES
--- ============================================
-
--- View combining users with their task counts
-CREATE OR REPLACE VIEW user_task_stats AS
+-- Tasks with full details view
+CREATE OR REPLACE VIEW tasks_detailed AS
 SELECT 
-    u.id,
-    u.name,
-    u.email,
-    u.avatar_url,
-    u.role,
+    t.id, t.title, t.description, 
+    t.assignee_id, u.name as assignee_name, u.email as assignee_email, u.avatar_url as assignee_avatar,
+    t.category_id, c.name as category_name, c.color as category_color, c.icon as category_icon,
+    c.type as category_type, c.parent_id as category_parent_id,
+    t.due_date, t.priority, t.status, t.is_recurring, t.eat_that_frog,
+    t.estimated_hours, t.actual_hours, t.reminder_at,
+    t.created_at, t.updated_at, t.completed_at
+FROM tasks t
+LEFT JOIN users u ON t.assignee_id = u.id  
+LEFT JOIN categories c ON t.category_id = c.id;
+
+-- User dashboard stats view
+CREATE OR REPLACE VIEW user_dashboard_stats AS
+SELECT 
+    u.id as user_id,
+    u.name as user_name,
     COUNT(t.id) as total_tasks,
-    COUNT(CASE WHEN t.status = 'To Do' THEN 1 END) as todo_tasks,
-    COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END) as in_progress_tasks,
-    COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks
+    COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks,
+    COUNT(CASE WHEN t.status != 'Done' THEN 1 END) as pending_tasks,
+    COUNT(CASE WHEN t.status != 'Done' AND t.due_date < CURRENT_DATE THEN 1 END) as overdue_tasks,
+    COUNT(CASE WHEN t.eat_that_frog = true AND t.status = 'Done' THEN 1 END) as frogs_eaten,
+    COALESCE(SUM(te.duration_minutes), 0) as total_time_minutes
 FROM users u
 LEFT JOIN tasks t ON u.id = t.assignee_id
-GROUP BY u.id, u.name, u.email, u.avatar_url, u.role;
+LEFT JOIN time_entries te ON t.id = te.task_id
+GROUP BY u.id, u.name;
 
--- View for recent activity feed
-CREATE OR REPLACE VIEW recent_activity AS
-SELECT 
-    al.id,
-    al.message,
-    al.action,
-    al.created_at,
-    u.name as user_name,
-    u.avatar_url as user_avatar,
-    t.title as task_title
-FROM activity_logs al
-LEFT JOIN users u ON al.user_id = u.id
-LEFT JOIN tasks t ON al.task_id = t.id
-ORDER BY al.created_at DESC;
-
--- ============================================
+-- =============================================
 -- SUCCESS MESSAGE
--- ============================================
-
+-- =============================================
 DO $$
 BEGIN
-    RAISE NOTICE '🎉 Team TaskFlow database setup completed successfully!';
-    RAISE NOTICE '✅ Created tables: users, auth_users, tasks, activity_logs, chat_messages, user_preferences, task_comments, task_attachments';
-    RAISE NOTICE '✅ Added indexes for performance optimization';
-    RAISE NOTICE '✅ Enabled Row Level Security (RLS) with permissive policies';
-    RAISE NOTICE '✅ Created triggers for automatic updated_at timestamps';
-    RAISE NOTICE '✅ Inserted sample data for testing';
-    RAISE NOTICE '✅ Created useful views for common queries';
     RAISE NOTICE '';
-    RAISE NOTICE '📊 Sample Data Summary:';
-    RAISE NOTICE '   - 4 Users: Alex Johnson (admin), Maria Garcia, James Smith, Li Wei';
-    RAISE NOTICE '   - 5 Tasks with different priorities and statuses';
-    RAISE NOTICE '   - Activity logs for task creation and status changes';
-    RAISE NOTICE '   - User preferences for personalization';
+    RAISE NOTICE '🎉 ===== TEAM TASKFLOW DATABASE SETUP COMPLETE! =====';
     RAISE NOTICE '';
-    RAISE NOTICE '🚀 Your Team TaskFlow database is ready to use!';
+    RAISE NOTICE '📊 TABLES CREATED:';
+    RAISE NOTICE '   ✅ users (4 sample users)';
+    RAISE NOTICE '   ✅ categories (10 categories with hierarchy)';  
+    RAISE NOTICE '   ✅ tasks (6 sample tasks with variety)';
+    RAISE NOTICE '   ✅ task_comments (for task discussions)';
+    RAISE NOTICE '   ✅ time_entries (for time tracking & pomodoro)';
+    RAISE NOTICE '   ✅ notifications (for user alerts)';
+    RAISE NOTICE '   ✅ user_preferences (for personalization)';
+    RAISE NOTICE '   ✅ activity_logs (for audit trail)';
+    RAISE NOTICE '';
+    RAISE NOTICE '🔒 SECURITY:';
+    RAISE NOTICE '   ✅ Row Level Security (RLS) enabled';
+    RAISE NOTICE '   ✅ Policies configured for authenticated access';
+    RAISE NOTICE '';
+    RAISE NOTICE '⚡ PERFORMANCE:';
+    RAISE NOTICE '   ✅ Comprehensive indexes created';
+    RAISE NOTICE '   ✅ Full-text search ready (Indonesian)';
+    RAISE NOTICE '   ✅ Auto-updating timestamps';
+    RAISE NOTICE '';
+    RAISE NOTICE '🚀 READY TO USE:';
+    RAISE NOTICE '   ✅ Utility functions available';
+    RAISE NOTICE '   ✅ Dashboard views created';
+    RAISE NOTICE '   ✅ Sample data populated';
+    RAISE NOTICE '';
+    RAISE NOTICE '📱 Your Team TaskFlow app is now ready!';
+    RAISE NOTICE '   Test connection at: http://localhost:5173';
+    RAISE NOTICE '';
 END $$;

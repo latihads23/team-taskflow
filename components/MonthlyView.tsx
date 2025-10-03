@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Task, User, Priority, Category } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
+import { TIMEZONE, LOCALE, getCurrentWIBDate, getWIBDateString } from '../constants';
 
 interface MonthlyViewProps {
   tasks: Task[];
@@ -18,7 +19,7 @@ const priorityColors: { [key in Priority]: string } = {
 };
 
 const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, categoriesMap, onViewDetails }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(getCurrentWIBDate());
 
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
@@ -42,7 +43,7 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, categoriesMa
   };
   
   const isToday = (date: Date) => {
-    const today = new Date();
+    const today = getCurrentWIBDate();
     return date.getDate() === today.getDate() &&
            date.getMonth() === today.getMonth() &&
            date.getFullYear() === today.getFullYear();
@@ -52,7 +53,11 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, categoriesMa
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-slate-800">
-          {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+          {currentDate.toLocaleString(LOCALE, { 
+            month: 'long', 
+            year: 'numeric',
+            timeZone: TIMEZONE
+          })}
         </h2>
         <div className="flex items-center space-x-2">
           <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-slate-100 text-slate-500">
@@ -65,13 +70,13 @@ const MonthlyView: React.FC<MonthlyViewProps> = ({ tasks, usersMap, categoriesMa
       </div>
 
       <div className="grid grid-cols-7 gap-px border-l border-t border-slate-200 bg-slate-200">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(dayName => (
+        {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(dayName => (
           <div key={dayName} className="text-center py-2 text-xs font-semibold text-slate-600 bg-slate-50">
             {dayName}
           </div>
         ))}
         {days.map(d => {
-          const dateString = d.toISOString().split('T')[0];
+          const dateString = getWIBDateString(d);
           const tasksForDay = tasks.filter(task => task.dueDate === dateString);
           return (
             <div

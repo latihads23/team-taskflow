@@ -7,6 +7,7 @@ interface TaskBoardProps {
   tasks: Task[];
   usersMap: Map<string, User>;
   categoriesMap: Map<string, Category>;
+  categories: Category[]; // Add categories array for hierarchy
   onViewDetails: (task: Task) => void;
   onStatusChange: (taskId: string, newStatus: Status) => void;
 }
@@ -17,7 +18,7 @@ const statusConfig: { [key in Status]: { title: string; color: string } } = {
   [Status.Done]: { title: "Done", color: "bg-green-200" },
 };
 
-const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, categoriesMap, onViewDetails, onStatusChange }) => {
+const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, categoriesMap, categories, onViewDetails, onStatusChange }) => {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<Status | null>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,6 +124,7 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, usersMap, categoriesMap, o
                   task={task}
                   user={usersMap.get(task.assigneeId)}
                   category={task.categoryId ? categoriesMap.get(task.categoryId) : undefined}
+                  categories={categories}
                   onClick={() => onViewDetails(task)}
                   onDragStart={(e) => handleDragStart(e, task.id)}
                   onDragEnd={handleDragEnd}

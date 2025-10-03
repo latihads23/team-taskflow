@@ -2,11 +2,13 @@
 import React from 'react';
 import { Task, User, Priority, Category } from '../types';
 import { RefreshCwIcon } from './Icons';
+import { formatDateWIB, TIMEZONE, getCurrentWIBDate } from '../constants';
 
 interface TaskCardProps {
   task: Task;
   user?: User;
   category?: Category;
+  categories: Category[]; // All categories for hierarchy lookup
   onClick: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -28,9 +30,10 @@ const dayDiff = (d1: Date, d2: Date): number => {
 };
 
 export const formatDueDate = (dateString: string) => {
-    const today = new Date();
+    const today = getCurrentWIBDate();
     today.setHours(0, 0, 0, 0); 
     const dueDate = new Date(dateString + 'T00:00:00');
+    dueDate.setHours(0, 0, 0, 0);
 
     const diff = dayDiff(today, dueDate);
 
@@ -53,17 +56,42 @@ export const formatDueDate = (dateString: string) => {
         text = `In ${diff} days`;
         color = 'text-slate-500';
     } else {
-        text = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        text = dueDate.toLocaleDateString('id-ID', { 
+            timeZone: TIMEZONE,
+            month: 'short', 
+            day: 'numeric' 
+        });
         color = 'text-slate-500';
     }
     
     return { text, color };
 };
 
-const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, category, onClick, onDragStart, onDragEnd, isDragging }) => {
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, category, categories, onClick, onDragStart, onDragEnd, isDragging }) => {
   const { title, description, dueDate, priority } = task;
   const config = priorityConfig[priority];
   const { text: dateText, color: dateColor } = React.useMemo(() => formatDueDate(dueDate), [dueDate]);
+
+  // Helper functions untuk hierarchy
+  const getMainCategory = (categoryId: string): Category | undefined => {
+    const cat = categories.find(c => c.id === categoryId);
+    if (!cat) return undefined;
+    
+    if (cat.type === 'main') return cat;
+    if (cat.parentId) {
+      return categories.find(c => c.id === cat.parentId);
+    }
+    return undefined;
+  };
+  
+  const getSubCategory = (categoryId: string): Category | undefined => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat?.type === 'sub' ? cat : undefined;
+  };
+  
+  const mainCategory = category ? getMainCategory(category.id) : undefined;
+  const subCategory = category ? getSubCategory(category.id) : undefined;
+  const displayCategory = subCategory || category; // Show subcategory first, fallback to category
 
   const handleClick = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,28 +103,66 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, category, on
     onDragStart(e);
   }, [onDragStart]);
 
+  // Convert hex to rgba with opacity
+  const hexToRgba = (hex: string, opacity: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
+
+  // Main category background style
+  const cardStyle = mainCategory ? {
+    background: `linear-gradient(135deg, ${hexToRgba(mainCategory.color, 0.08)} 0%, ${hexToRgba(mainCategory.color, 0.02)} 100%)`,
+    borderColor: hexToRgba(mainCategory.color, 0.2)
+  } : {};
+
   return (
     <div
       draggable
       onDragStart={handleDragStart}
       onDragEnd={onDragEnd}
       onClick={handleClick}
-      className={`w-full text-left bg-white rounded-lg shadow-sm border border-slate-200 p-4 space-y-3 hover:shadow-md hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-300 cursor-grab transform ${
+      style={cardStyle}
+      className={`w-full text-left bg-white rounded-lg shadow-sm border-2 p-4 space-y-3 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-300 cursor-grab transform ${
         isDragging 
           ? 'opacity-70 ring-2 ring-brand-400 ring-offset-2 scale-105 rotate-2 shadow-xl z-50' 
-          : 'hover:scale-102 active:scale-98'
+          : 'hover:scale-102 active:scale-98 hover:shadow-lg'
+      } ${
+        mainCategory ? 'border-opacity-30' : 'border-slate-200 hover:border-brand-300'
       }`}
     >
+      {/* Main category strip at top if exists */}
+      {mainCategory && (
+        <div 
+          className="-mx-4 -mt-4 mb-3 px-4 py-2 rounded-t-lg flex items-center space-x-2"
+          style={{ backgroundColor: hexToRgba(mainCategory.color, 0.15) }}
+        >
+          {mainCategory.icon && (
+            <span className="text-sm">{mainCategory.icon}</span>
+          )}
+          <span className="text-xs font-semibold" style={{ color: mainCategory.color }}>
+            {mainCategory.name}
+          </span>
+        </div>
+      )}
+      
       <div className="flex justify-between items-start">
         <div className="flex-1 pr-2">
           <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
-          {category && (
+          {displayCategory && (
             <div className="flex items-center space-x-1 mb-1">
+              {displayCategory.icon && (
+                <span className="text-xs">{displayCategory.icon}</span>
+              )}
               <span 
                 className="w-2 h-2 rounded-full flex-shrink-0" 
-                style={{ backgroundColor: category.color }}
+                style={{ backgroundColor: displayCategory.color }}
               ></span>
-              <span className="text-xs text-slate-600 font-medium">{category.name}</span>
+              <span className="text-xs text-slate-600 font-medium">{displayCategory.name}</span>
+              {subCategory && mainCategory && (
+                <span className="text-xs text-slate-400">• {mainCategory.name}</span>
+              )}
             </div>
           )}
         </div>
@@ -128,7 +194,8 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, user, category, on
     prevProps.task.categoryId === nextProps.task.categoryId &&
     prevProps.isDragging === nextProps.isDragging &&
     prevProps.user?.id === nextProps.user?.id &&
-    prevProps.category?.id === nextProps.category?.id
+    prevProps.category?.id === nextProps.category?.id &&
+    prevProps.categories.length === nextProps.categories.length
   );
 });
 

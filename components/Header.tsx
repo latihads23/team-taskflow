@@ -11,6 +11,7 @@ interface HeaderProps {
   currentUser: User;
   onOpenProfile: () => void;
   onOpenAISettings: () => void;
+  onOpenNotificationSettings: () => void;
   // New props for filtering
   users: User[];
   filters: { assignees: string[]; priorities: Priority[] };
@@ -30,6 +31,7 @@ const Header: React.FC<HeaderProps> = ({
   currentUser, 
   onOpenProfile,
   onOpenAISettings,
+  onOpenNotificationSettings,
   users,
   filters,
   onFilterChange,
@@ -220,6 +222,18 @@ const Header: React.FC<HeaderProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       <span>🤖 AI Settings</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onOpenNotificationSettings();
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-5 5-5-5h5V4h5v13z" />
+                      </svg>
+                      <span>🔔 Notification Settings</span>
                     </button>
                     {authUser.role === 'admin' && (
                       <>

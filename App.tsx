@@ -15,12 +15,17 @@ import ActivityFeed from './components/ActivityFeed';
 import UserProfileModal from './components/UserProfileModal';
 import Login from './components/Login';
 import { authService } from './services/authService';
+import ProtectedRoute from './components/ProtectedRoute';
 // New imports for enhanced features
 import UserManagement from './components/admin/UserManagement';
 import CategoryManagement from './components/CategoryManagement';
 import AISettingsComponent from './components/AISettings';
+import NotificationSettings from './components/NotificationSettings';
 import { userService, categoryService, taskService, timeEntryService, timeBoxService } from './services/hybridStorage';
 import { aiService } from './services/aiService';
+import notificationService from './services/notificationService';
+// Constants and timezone support
+import { DEFAULT_CATEGORIES, TIMEZONE, LOCALE, getCurrentWIBDate, getCurrentWIBDateString, formatDateTimeWIB } from './constants';
 
 // Mock Data for Users (can be moved to Supabase Auth later)
 const MOCK_USERS: User[] = [
@@ -44,13 +49,13 @@ const MOCK_USERS: User[] = [
       github: 'https://github.com/alexjohnson'
     },
     preferences: {
-      timezone: 'America/Los_Angeles',
-      language: 'en',
+      timezone: TIMEZONE, // Asia/Jakarta - WIB
+      language: LOCALE, // id-ID
       notifications: true,
       theme: 'light'
     },
-    createdAt: new Date().toISOString(), 
-    updatedAt: new Date().toISOString() 
+    createdAt: getCurrentWIBDate().toISOString(), 
+    updatedAt: getCurrentWIBDate().toISOString()
   },
   { 
     id: 'u2', 
@@ -72,13 +77,13 @@ const MOCK_USERS: User[] = [
       linkedin: 'https://linkedin.com/in/mariagarcia'
     },
     preferences: {
-      timezone: 'America/New_York',
-      language: 'en',
+      timezone: TIMEZONE, // Asia/Jakarta - WIB
+      language: LOCALE, // id-ID
       notifications: true,
       theme: 'light'
     },
-    createdAt: new Date().toISOString(), 
-    updatedAt: new Date().toISOString() 
+    createdAt: getCurrentWIBDate().toISOString(), 
+    updatedAt: getCurrentWIBDate().toISOString()
   },
   { 
     id: 'u3', 
@@ -100,13 +105,13 @@ const MOCK_USERS: User[] = [
       github: 'https://github.com/jamessmith'
     },
     preferences: {
-      timezone: 'America/Chicago',
-      language: 'en',
+      timezone: TIMEZONE, // Asia/Jakarta - WIB
+      language: LOCALE, // id-ID
       notifications: false,
       theme: 'dark'
     },
-    createdAt: new Date().toISOString(), 
-    updatedAt: new Date().toISOString() 
+    createdAt: getCurrentWIBDate().toISOString(), 
+    updatedAt: getCurrentWIBDate().toISOString()
   },
   { 
     id: 'u4', 
@@ -127,22 +132,48 @@ const MOCK_USERS: User[] = [
       linkedin: 'https://linkedin.com/in/liwei'
     },
     preferences: {
-      timezone: 'America/Los_Angeles',
-      language: 'en',
+      timezone: TIMEZONE, // Asia/Jakarta - WIB
+      language: LOCALE, // id-ID
       notifications: true,
       theme: 'auto'
     },
-    createdAt: new Date().toISOString(), 
-    updatedAt: new Date().toISOString() 
+    createdAt: getCurrentWIBDate().toISOString(), 
+    updatedAt: getCurrentWIBDate().toISOString()
   },
 ];
 
 const CURRENT_USER_ID = 'u1'; // Let's assume Alex is the current user
 
+// Utility function to get main category for a task
+const getMainCategory = (categories: Category[], categoryId?: string): Category | undefined => {
+  if (!categoryId) return undefined;
+  
+  const category = categories.find(c => c.id === categoryId);
+  if (!category) return undefined;
+  
+  // If it's already a main category, return it
+  if (category.type === 'main') return category;
+  
+  // If it's a sub category, find its parent
+  if (category.type === 'sub' && category.parentId) {
+    return categories.find(c => c.id === category.parentId && c.type === 'main');
+  }
+  
+  return undefined;
+};
+
+// Utility function to get sub category
+const getSubCategory = (categories: Category[], categoryId?: string): Category | undefined => {
+  if (!categoryId) return undefined;
+  
+  const category = categories.find(c => c.id === categoryId);
+  return category?.type === 'sub' ? category : undefined;
+};
+
+// Using imported DEFAULT_CATEGORIES from constants.ts with WIB timezone
+
 export const App: React.FC = () => {
-  // Authentication state
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  // Note: Authentication is now handled by ProtectedRoute component
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
@@ -167,6 +198,7 @@ export const App: React.FC = () => {
   const [isActivityFeedOpen, setActivityFeedOpen] = useState(false);
   const [isUserProfileOpen, setUserProfileOpen] = useState(false);
   const [isAISettingsOpen, setAISettingsOpen] = useState(false);
+  const [isNotificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
 
   // Time Management state
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
@@ -212,7 +244,7 @@ export const App: React.FC = () => {
         const loadedTimeBoxes = await timeBoxService.getTimeBoxes();
         
         setUsers(loadedUsers.length > 0 ? loadedUsers : MOCK_USERS);
-        setCategories(loadedCategories);
+        setCategories(loadedCategories.length > 0 ? loadedCategories : DEFAULT_CATEGORIES);
         setTimeEntries(loadedTimeEntries);
         setTimeBoxes(loadedTimeBoxes);
         
@@ -254,6 +286,38 @@ export const App: React.FC = () => {
     initAuth();
   }, []);
 
+  // Initialize notification service and listeners
+  useEffect(() => {
+    // Handle notification click events
+    const handleNotificationTaskClick = (event: CustomEvent) => {
+      const { taskId } = event.detail;
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        handleViewDetails(task);
+      }
+    };
+
+    // Add event listener for notification clicks
+    window.addEventListener('notificationTaskClick', handleNotificationTaskClick as EventListener);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('notificationTaskClick', handleNotificationTaskClick as EventListener);
+    };
+  }, [tasks]);
+
+  // Setup task notifications when tasks change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      // Schedule reminders for tasks with due dates
+      tasks.forEach(task => {
+        if (task.dueDate && task.status !== Status.Done) {
+          notificationService.scheduleTaskReminders(task);
+        }
+      });
+    }
+  }, [tasks]);
+
   // Authentication handlers
   const handleLoginSuccess = useCallback((user: AuthUser) => {
     setAuthUser(user);
@@ -275,7 +339,7 @@ export const App: React.FC = () => {
     addToast(message, 'warning');
   }, [addToast]);
 
-  const handleAddTask = (taskData: TaskData) => {
+  const handleAddTask = async (taskData: TaskData) => {
     // Create temporary task with ID for immediate UI update
     const tempId = `temp_${Date.now()}`;
     const tempTask: Task = {
@@ -288,22 +352,36 @@ export const App: React.FC = () => {
     
     // Show immediate feedback
     addToast("Task created successfully!", "success");
-    addActivityLog(`Created task: "${taskData.title}"`);
+    addActivityLog(`Created task: \"${taskData.title}\"`);
     setTaskFormOpen(false);
     setSelectedTask(null);
     
     // Add to database and replace temp task with real one
-    addTask(taskData).then(taskId => {
-        setTasks(prevTasks => 
-          prevTasks.map(t => 
-            t.id === tempId ? { ...taskData, id: taskId } : t
-          )
-        );
-    }).catch(e => {
-        // Remove temp task on failure
-        setTasks(prevTasks => prevTasks.filter(t => t.id !== tempId));
-        addToast(`Failed to create task: ${e.message}`, 'warning');
-    });
+    try {
+      const taskId = await addTask(taskData);
+      const finalTask = { ...taskData, id: taskId };
+      
+      setTasks(prevTasks => 
+        prevTasks.map(t => 
+          t.id === tempId ? finalTask : t
+        )
+      );
+      
+      // Trigger assignment notification if assigned to someone else
+      const assignedUser = usersMap.get(taskData.assigneeId);
+      if (assignedUser && assignedUser.id !== currentUser?.id && assignedUser.preferences?.notifications) {
+        await notificationService.notifyTaskAssigned(finalTask, assignedUser.name);
+      }
+      
+      // Schedule reminder notifications
+      if (taskData.dueDate) {
+        notificationService.scheduleTaskReminders(finalTask);
+      }
+    } catch (e) {
+      // Remove temp task on failure
+      setTasks(prevTasks => prevTasks.filter(t => t.id !== tempId));
+      addToast(`Failed to create task: ${e instanceof Error ? e.message : 'Unknown error'}`, 'warning');
+    }
   };
 
   const handleUpdateTask = (taskData: Task) => {
@@ -360,7 +438,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleStatusChange = useCallback((taskId: string, newStatus: Status) => {
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: Status) => {
     const task = tasks.find(t => t.id === taskId);
     if(task && task.status !== newStatus) {
         // Optimistic update - immediate UI response
@@ -372,7 +450,12 @@ export const App: React.FC = () => {
         
         // Show immediate feedback
         addToast(`Task moved to ${newStatus}`, "success");
-        addActivityLog(`Moved task "${task.title}" to ${newStatus}`);
+        addActivityLog(`Moved task \"${task.title}\" to ${newStatus}`);
+        
+        // Trigger notification for task completion
+        if (newStatus === Status.Done && currentUser?.preferences?.notifications) {
+          await notificationService.notifyTaskCompleted(task);
+        }
         
         // Update in database (if fails, we'll revert)
         updateTask(taskId, { status: newStatus }).catch(e => {
@@ -385,7 +468,7 @@ export const App: React.FC = () => {
             addToast(`Failed to move task: ${e.message}`, 'warning');
         });
     }
-  }, [tasks, addToast, addActivityLog]);
+  }, [tasks, addToast, addActivityLog, currentUser]);
   
   const handleDeleteTask = () => {
     if (!selectedTask) return;
@@ -720,34 +803,10 @@ export const App: React.FC = () => {
     });
   }, [tasks, filters]);
 
-  // Show loading screen while checking authentication
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading Team TaskFlow...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show login screen if not authenticated
-  if (!authUser) {
-    return (
-      <>
-        <Login 
-          onLoginSuccess={handleLoginSuccess}
-          onError={handleLoginError}
-        />
-        <ToastContainer toasts={toasts} />
-      </>
-    );
-  }
-
-  // Show main app when authenticated
+  // Main app content - wrapped with ProtectedRoute
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-slate-100 flex flex-col">
       <Header
         onAddTask={() => { setSelectedTask(null); setTaskFormOpen(true); }}
         onAddSmartTask={() => setSmartTaskFormOpen(true)}
@@ -757,6 +816,7 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         onOpenProfile={() => setUserProfileOpen(true)}
         onOpenAISettings={() => setAISettingsOpen(true)}
+        onOpenNotificationSettings={() => setNotificationSettingsOpen(true)}
         users={users}
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -771,6 +831,7 @@ export const App: React.FC = () => {
               tasks={filteredTasks}
               usersMap={usersMap}
               categoriesMap={categoriesMap}
+              categories={categories}
               onViewDetails={handleViewDetails}
               onStatusChange={handleStatusChange}
             />
@@ -862,7 +923,12 @@ export const App: React.FC = () => {
         isOpen={isAISettingsOpen}
         onClose={() => setAISettingsOpen(false)}
       />
+      <NotificationSettings
+        isOpen={isNotificationSettingsOpen}
+        onClose={() => setNotificationSettingsOpen(false)}
+      />
       <ToastContainer toasts={toasts} />
     </div>
+    </ProtectedRoute>
   );
 };

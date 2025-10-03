@@ -124,12 +124,15 @@ CREATE TABLE users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- categories table
+-- categories table (Enhanced with Hierarchy Support)
 CREATE TABLE categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   color TEXT NOT NULL,
   description TEXT,
+  type TEXT DEFAULT 'main' CHECK (type IN ('main', 'sub')), -- Hierarchical support
+  parent_id UUID REFERENCES categories(id),               -- Parent category reference
+  icon TEXT,                                              -- Emoji or icon for categories
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -207,8 +210,9 @@ Output: {
 - ✅ **Real-time Sync** - Multi-user collaboration via Supabase
 - ✅ **Multiple Views** - Kanban board & Calendar view
 - ✅ **Smart Creation** - AI-powered task parsing
-- ✅ **User Management** - Add, edit, delete users
-- ✅ **Category Management** - Organize tasks with categories
+- ✅ **User Management** - Add, edit, delete users with phone support
+- ✅ **Hierarchical Categories** - Main categories with subcategories (Kerjaan/Personal structure)
+- ✅ **Category Management** - Visual category organization with icons and colors
 - ✅ **Priority System** - Low, Medium, High, Urgent
 - ✅ **Status Tracking** - To Do, In Progress, Done
 - ✅ **Activity Feed** - Real-time activity logging
@@ -260,10 +264,10 @@ npm run preview
 ### Environment Variables
 ```bash
 # Development (.env)
-VITE_GEMINI_API_KEY=         # Gemini AI API key
-VITE_OPENAI_API_KEY=         # OpenAI API key for GPT models
-VITE_SUPABASE_URL=          # Supabase project URL
-VITE_SUPABASE_ANON_KEY=     # Supabase anonymous key
+VITE_GEMINI_API_KEY=your_gemini_api_key_here         # Gemini AI API key
+VITE_OPENAI_API_KEY=sk-QzypM7mGKUxsTBg9upedbcUBLprbCz2STmHUx2ufed8v3LWg  # OpenAI API key (configured)
+VITE_SUPABASE_URL=https://hyouvmkmqybjrmpdhukn.supabase.co          # Supabase project URL (UPDATED)
+VITE_SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5b3V2bWttcXlianJtcGRodWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MTA2ODcsImV4cCI6MjA3NTA4NjY4N30.ro0OZn9b6kVPEARRPMGf342AE1GK3s906TjmJhWKOJA  # Supabase anon key (UPDATED)
 ```
 
 ### Security Notes
@@ -369,9 +373,9 @@ const MOCK_USERS = [
 ## 📝 Development Notes
 
 ### Setup Date: 2025-09-08
-### Last Updated: 2025-09-22
-### Status: Production Ready + Enhanced Features
-### Version: 1.1.1 (Latest Enhancements & Fixes)
+### Last Updated: 2025-10-03
+### Status: Production Ready + Complete Authentication System
+### Version: 1.6.0 (Complete Database Authentication & CRUD)
 
 ### Build Info
 - Dependencies: Updated dengan Supabase & lucide-react
@@ -384,17 +388,179 @@ const MOCK_USERS = [
 - User/Category Management: ✅
 - Real-time subscriptions: ✅
 
-### Recent Improvements (2025-09-22)
-- 🚀 **Version 1.1.1 Release** - Latest enhancement deployment completed
-- 📱 **Enhanced User Management** - Added phone number field to user profiles
-- 🔄 **Time Management Integration** - Eat That Frog fully integrated into Time Management dashboard
-- 💾 **Database Services** - Added comprehensive time entry and time box services
-- 🏠 **UI Streamlining** - Removed separate Eat That Frog view, consolidated into unified dashboard
-- 🔧 **Code Quality** - Fixed UserManagement component compilation issues
-- 📊 **Storage Enhancement** - Extended fallback storage with time management support
-- 🎆 **Production Ready** - Full compilation success, all features tested
-- ✅ **Git Integration** - Successfully committed and pushed to GitHub repository
-- 🔄 **Documentation Updated** - WARP.md synchronized with latest codebase changes
+### Browser Notifications System 🔔
+
+Team TaskFlow sekarang dilengkapi **browser notification system** yang comprehensive untuk remind tasks, deadlines, dan activities penting!
+
+#### Features
+- **Smart Reminders**: Otomatis schedule reminders berdasarkan task priority
+- **Permission Management**: Easy permission request dengan guidance untuk users
+- **Multiple Notification Types**: Task completion, assignments, deadlines, Pomodoro, Eat That Frog
+- **Notification Settings**: User-friendly control panel dengan test functionality
+- **WIB Timezone Aware**: Semua scheduling menggunakan Indonesia timezone
+- **Persistent Scheduling**: Notifications tersimpan di localStorage dengan auto-reload
+
+#### Notification Types
+
+🎯 **Priority-Based Reminders**:
+- **Urgent Tasks**: 2 days, 1 day, 4 hours, 1 hour before
+- **High Priority**: 2 days, 1 day, 4 hours before
+- **Medium Priority**: 1 day, 4 hours before
+- **Low Priority**: 1 day before
+
+🎉 **Event Notifications**:
+- **Task Completed**: Celebration notification saat task selesai
+- **Task Assigned**: Notification untuk assignee baru
+- **Deadline Alert**: Urgent notification untuk overdue tasks
+- **Pomodoro Complete**: Timer completion dengan break reminder
+- **Eat That Frog**: Reminder untuk most important task
+
+#### Technical Implementation
+```javascript
+// Notification Service dengan WIB timezone
+const notificationService = {
+  // Schedule priority-based reminders
+  scheduleTaskReminders(task: Task): void
+  
+  // Show immediate notifications
+  async showNotification(options: NotificationOptions): Promise<boolean>
+  
+  // Task-specific notifications
+  async notifyTaskCompleted(task: Task): Promise<boolean>
+  async notifyTaskAssigned(task: Task, assigneeName: string): Promise<boolean>
+  async notifyTaskDeadline(task: Task): Promise<boolean>
+  async notifyPomodoroComplete(taskTitle?: string): Promise<boolean>
+  async notifyEatThatFrog(task: Task): Promise<boolean>
+}
+```
+
+#### User Experience
+- **Settings Panel**: Accessible dari user menu dengan 🔔 Notification Settings
+- **Permission Guide**: Step-by-step instructions untuk enable notifications
+- **Test Functionality**: Send test notification untuk verify settings
+- **Active Notifications Counter**: Display jumlah scheduled reminders
+- **Browser Compatibility Check**: Automatic detection dan feedback
+
+#### Integration Points
+- **Task Creation**: Auto-schedule reminders untuk new tasks
+- **Status Changes**: Completion notifications saat task done
+- **Task Assignment**: Notify assignees tentang new tasks
+- **Header Menu**: Easy access ke notification settings
+- **Event Listeners**: Handle notification clicks untuk navigate ke tasks
+
+### WIB Timezone Support 🇮🇩
+
+Team TaskFlow sekarang full support **timezone Indonesia (WIB - Western Indonesia Time)** dengan localization lengkap!
+
+#### Features
+- **WIB Timezone**: Semua date/time menggunakan Asia/Jakarta timezone
+- **Indonesian Locale**: Date formatting dengan bahasa Indonesia (id-ID)
+- **Calendar Localization**: Month names dan day labels dalam bahasa Indonesia
+- **Consistent Formatting**: Unified date utilities untuk seluruh aplikasi
+
+#### Technical Implementation
+```javascript
+// Constants untuk timezone dan locale
+export const TIMEZONE = 'Asia/Jakarta'; // WIB
+export const LOCALE = 'id-ID'; // Indonesian
+
+// Utility functions
+export const getCurrentWIBDate = (): Date => {
+  return new Date(new Date().toLocaleString("en-US", {timeZone: TIMEZONE}));
+};
+
+export const formatDateWIB = (date: string | Date): string => {
+  return dateObj.toLocaleDateString(LOCALE, {
+    timeZone: TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+```
+
+#### Calendar Localization
+- **Month Names**: Januari, Februari, Maret, etc.
+- **Day Labels**: Min, Sen, Sel, Rab, Kam, Jum, Sab
+- **Date Display**: Format Indonesia dengan timezone WIB
+- **User Preferences**: All users default to WIB timezone
+
+### Hierarchical Categories Feature 🏷️
+
+Team TaskFlow sekarang mendukung **hierarchical categories** dengan struktur main category dan subcategory yang powerful!
+
+#### Structure
+- **Main Categories**: Category utama (contoh: "Kerjaan", "Personal") 
+- **Subcategories**: Category turunan (contoh: "Meeting Customer", "Imers", "Olahraga")
+- **Visual Design**: Main category color menjadi background card, subcategory ditampilkan dengan detail
+
+#### Default Categories
+```javascript
+🏢 **Kerjaan** (Main - Blue)
+  └── 👥 Meeting Customer (Sub - Light Blue)
+  └── 💰 Imers (Sub - Green)
+  └── 🔧 Development (Sub - Purple)
+  └── 📊 Admin (Sub - Orange)
+
+🏠 **Personal** (Main - Pink)
+  └── 🏃‍♂️ Olahraga (Sub - Red)
+  └── 📚 Belajar (Sub - Indigo)
+  └── 🍳 Masak (Sub - Yellow)
+  └── 🎮 Hobi (Sub - Teal)
+```
+
+#### TaskCard Visual Enhancement
+- **Main category strip** di bagian atas card dengan background color
+- **Subcategory indicator** dengan icon, color dot, dan nama
+- **Gradient background** menggunakan main category color dengan opacity
+- **Hover effects** yang smooth dan responsive
+
+#### Technical Implementation
+- Utility functions: `getMainCategory()` dan `getSubCategory()`
+- Hierarchical data flow dari App → TaskBoard → TaskCard
+- Enhanced props dengan `categories` array untuk hierarchy lookup
+- Memo optimization untuk performance
+
+### Recent Improvements (2025-10-03)
+- 🎉 **Version 1.6.0 Release** - Complete Database Authentication & CRUD System
+- 🗄️ **Database CRUD Operations** - Full Create, Read, Update, Delete functionality pada semua tables
+- 🔐 **Authentication System** - Complete user registration, login, session management
+- 🛡️ **Row Level Security (RLS)** - Secure data isolation per user dengan Supabase RLS policies
+- 📊 **Database Schema** - 11+ tables dengan relationships, triggers, dan utility functions
+- 🧪 **CRUD Testing** - Comprehensive test suite untuk verify database operations
+- 🔑 **User Management** - Profile creation, preferences, activity logging
+- 📋 **Task Management** - Complete task CRUD dengan categories dan time tracking
+- ⚡ **Real-time Subscriptions** - Database changes sync real-time ke aplikasi
+- 🔧 **Database Functions** - Custom PostgreSQL functions untuk productivity stats
+- 🚀 **Version 1.5.0 Release** - Browser Notifications & Enhanced UX (previous)
+- 🔔 **Browser Notifications** - Complete notification system dengan scheduling & permission management (previous)
+- 📱 **Notification Service** - Smart reminders based on task priority and deadlines (previous)
+- 🎛️ **Notification Settings** - User-friendly settings panel untuk notification control (previous)
+- 🇮🇩 **Indonesia Timezone (WIB)** - Complete application timezone support untuk Asia/Jakarta (previous)
+- 🔑 **OpenAI API Integration** - Added OpenAI API key support alongside Gemini AI (previous)
+- 📅 **Calendar Localization** - Indonesian month names dan day labels (Min, Sen, Sel, etc.) (previous)
+- 🔧 **Constants Architecture** - Centralized timezone, locale, dan formatting utilities (previous)
+- 📊 **Date Utilities** - WIB-aware date formatting functions (formatDateWIB, getCurrentWIBDate) (previous)
+- 🌐 **Locale Support** - Indonesian locale (id-ID) untuk konsistensi formatting (previous)
+- 🚀 **Version 1.3.0 Release** - Hierarchical Categories Implementation completed (previous)
+- 🏗️ **Hierarchical Categories** - Main/subcategory structure dengan visual hierarchy (previous)
+- 🎨 **TaskCard Enhancement** - Main category background color coverage dengan subcategory detail (previous)
+- 🔄 **Component Updates** - TaskBoard dan TaskCard support categories array prop (previous)
+- 📊 **Default Categories** - Kerjaan/Personal structure dengan 8 subcategories (previous)
+- 🎯 **Visual Design** - Gradient backgrounds, category strips, dan enhanced hover effects (previous)
+- 🔧 **Technical Architecture** - Utility functions untuk category hierarchy management (previous)
+- 🏷️ **Categories Display Fixed** - Categories now properly display in Kanban Board, Calendar View, TaskCard, and Task Detail Modal (previous release)
+- 🎨 **Enhanced UI Components** - Updated TaskCard, TaskBoard, MonthlyView, TaskFormModal, TaskDetailModal with full category support (previous release)
+- 🔧 **Component Architecture** - Added categoriesMap props and category data flow throughout component hierarchy (previous release)
+- 📝 **Forms Enhancement** - TaskFormModal now includes category dropdown selection with color coding (previous release)
+- 👁️ **Visual Improvements** - Category indicators with color dots and labels across all task display components (previous release)
+- 🔑 **API Configuration** - Updated environment variables with secure placeholder format for AI services (previous release)
+- 📱 **Enhanced User Management** - Added phone number field to user profiles (previous release)
+- 🔄 **Time Management Integration** - Eat That Frog fully integrated into Time Management dashboard (previous release)
+- 💾 **Database Services** - Added comprehensive time entry and time box services (previous release)
+- ✅ **Build Verification** - Full TypeScript compilation success, production build tested
+- 🌐 **Git Integration** - Successfully committed and pushed to GitHub repository
+- 📄 **Documentation Updated** - WARP.md synchronized with latest codebase changes
 
 ## 🚀 Quick Start Guide
 

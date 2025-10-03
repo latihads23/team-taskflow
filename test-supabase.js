@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://cqqruphhynqinioklsax.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxcXJ1cGhoeW5xaW5pb2tsc2F4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2MDIyODMsImV4cCI6MjA3MzE3ODI4M30.p8O7k2CtCR6_QgoVbReYoWI36ymucb1lb35DT0XT-ao'
+const supabaseUrl = 'https://hyouvmkmqybjrmpdhukn.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5b3V2bWttcXlianJtcGRodWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MTA2ODcsImV4cCI6MjA3NTA4NjY4N30.ro0OZn9b6kVPEARRPMGf342AE1GK3s906TjmJhWKOJA'
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function testConnection() {

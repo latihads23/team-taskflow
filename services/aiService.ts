@@ -37,10 +37,10 @@ export interface AISettings {
 
 // Default settings
 export const DEFAULT_AI_SETTINGS: AISettings = {
-  primaryProvider: 'openai', // Back to OpenAI as primary with valid key
+  primaryProvider: 'gemini', // Use Gemini as primary since it's working
   enableFallback: true,
   openaiModel: 'gpt-3.5-turbo',
-  geminiModel: 'gemini-1.5-flash', // Use newer available model
+  geminiModel: 'gemini-pro', // Use stable model
   mode: 'general',
   expertDomain: 'business',
   customInstructions: '',
@@ -298,6 +298,7 @@ export class AIService {
       }
     ];
     
+    // Use direct OpenAI API endpoint
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
